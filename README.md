@@ -20,11 +20,13 @@ Resume tools are either a web app you click through, or a chat that can't touch 
 |---|---|
 | **Left-rail entry, full-page editor** | Rendered in the Harness Web UI as a real panel (`main/resume`), not an overlaid iframe hack. List · preview · form, all three columns resizable. |
 | **No login, no API keys** | Reads and writes the resume document straight from `resume.data` (jsonb). The upstream app's auth, dashboard and API-key dance are simply not on the path. |
-| **Self-hosted rendering** | 15 template manifests + one HTML/CSS engine. Preview and PDF export share the exact same layout, so what you see is what you export. |
+| **Self-hosted rendering** | 15 built-in template manifests + any custom ones + one HTML/CSS engine. Preview and PDF export share the exact same layout, so what you see is what you export. Section headings follow the **resume's own `metadata.page.locale`** (zh / en / de), not the panel language. |
 | **Document-level quoting** | Double-click a block → JSON Pointer. Drag-select a word → word + owning block. Both land in the chat as a structured request. |
 | **Real style controls** | Line height, photo radius, page margins, sidebar width are sliders bound to the document — drag, see it, save. |
-| **Template authoring by example** | Upload a screenshot from the template gallery → an agent (isolated context, code-built brief) writes a manifest → it is validated, saved and appears in the gallery. |
-| **One-click export** | Chromium `printToPDF` in the host process → `04-输出/<name>/<name>-CV.pdf`, path copied to clipboard. |
+| **Template authoring by example** | Upload a screenshot in the gallery → the panel dispatches a **context-free** subagent (`/template-build`, code-built brief, `read_image` first) → manifest validated, saved, appears in the gallery. |
+| **One-click export** | Chromium `printToPDF` in the host process → `04-输出/<name>/<name>-CV.pdf`, path copied to clipboard. No model, no chat message. |
+| **Bound conversation** | The panel sends to **the conversation you opened it from** (`uiSession.current` snapshot, sticky). No more "first live agent" lottery: an unbound or archived target fails loudly. |
+| **Edits go to a worker** | Bulk layout/wording work goes through `resume_dispatch` → a fresh-context "resume assistant" child; the lead only decides *what*, the child reads the document itself. |
 | **Service lifecycle** | `resume_service(start|stop|status)`; auto-start on activation; `pg_ctl` + detached node, so nothing dies with a tool call. |
 
 ## Install
@@ -41,8 +43,12 @@ Requires a local **Reactive Resume** checkout plus a portable PostgreSQL under `
 
 ## Tools exposed to the agent
 
-`resume_service` · `resume_doctor` · `resume_list` · `resume_show` · `resume_patch` · `resume_photo` ·
-`resume_export` · `resume_new` · `resume_template`
+`resume_service` · `resume_doctor` · `resume_list` · `resume_show` · `resume_dispatch` · `resume_patch` ·
+`resume_photo` · `resume_export` · `resume_new` · `resume_template`
+
+`resume_dispatch` is the default path for editing: the lead fills `intent` / `resumeId` / `paths` / `excerpt`,
+and a **fresh-context** `spawn` child reads the document, patches only those pointers, verifies, and reports
+back through a completion notice. The brief is generated in code (`lib/worker-brief.js`), not by the model.
 
 `resume_template(action=brief)` prints a complete, code-generated task brief (schema, allowed values,
 constraints, acceptance commands, reporting format) — that text **is** the prompt for a template-building subagent.
@@ -54,6 +60,13 @@ constraints, acceptance commands, reporting format) — that text **is** the pro
 - **Event-handler exceptions don't reach error boundaries.** A `ReferenceError` inside `onClick` produces a dead button and a console line, nothing more. `tools/verify-interaction.mjs` renders the panel with a stub React and clicks the buttons, so this class of bug is now a failing test instead of a mystery.
 - **Free-form canvas was removed.** Absolute positioning without measured heights overlaps text; a document is a flow, not a poster. Column order + template manifests cover the real need.
 - **Failure surfaces are explicit.** Panel crashes render the stack; preview failures print the reason; unverified paths are labelled as such.
+- **A delivered message must carry an `id`.** `agent.followup()` / `agent.inbox.append()` hand the object straight to the durable inbox, and the step boundary writes it back out as a `user/message` event. Session restore requires a non-empty message `id` (`assertMessageEventShape`), so an unidentified message does not fail at send time — it fails the next time that session's history is opened, with `session event at seq N lacks an identified message`. `lib/bridge.js` therefore builds messages via `createIdentifiedUserMessage()` (`randomUUID()`), and `tools/verify-ask.mjs` keeps that invariant honest.
+- **The panel never guesses a target.** `uiSession.current` is the session retained by the *main view*; once the resume panel occupies `main`, the conversation unmounts and `current` drifts. So the left-rail icon tracks `uiSession.current` while the panel is closed and freezes it on entry (`useSessionTarget`), and `/ask` refuses an empty or dead target instead of falling back to `agents.list()[0]`. `tools/verify-target-binding.mjs` fails the build if either old pattern comes back.
+
+- **Two languages, deliberately.** The panel's chrome follows the Harness locale (`TEXT`); the sheet follows the resume's `metadata.page.locale`, because that is what the PDF will be. `labelsFor(locale)` covers zh / en / de and falls back to zh — hard-coding Chinese headings is what made a `de-DE` resume look like an i18n bug.
+- **The gallery renders every id it lists.** Built-ins *and* custom manifests share one thumbnail pass; a failed render shows "preview failed" instead of spinning forever, and each card is labelled with the manifest's `label` (not its 31-hex id).
+- **A layout page may reference a section that no longer exists.** Reactive Resume custom sections are keyed by UUID; delete one and `metadata.layout.pages` keeps the orphan. The renderer always filtered those (`known` set), the panel did not — so the board showed a raw UUID chip. The board now filters against `doc.sections` (and appends real orphans to the last page), `sectionLabel(kind)` prefers the section's own `title`, and one save rewrites the stale page list.
+- **Adding/deleting a section is one atomic edit.** `＋` on a column head creates `sections[<uuid>] = { title, items: [], … }` and places it in that page/column; `×` on a chip asks for confirmation (item count included) and then deletes the section **and every layout reference to it** in the same draft, so no dangling id can be produced. Saving sends `sections` alongside `basics/summary/metadata/picture`, and the store backs up the previous document first.
 
 ## Verify locally
 
@@ -64,7 +77,19 @@ node tools/verify-pages.mjs            # layout.pages → N A4 sheets
 node tools/verify-skins.mjs <id>       # decorations really differ per template
 node tools/verify-interaction.mjs      # headless click-through of the panel
 node tools/verify-template-flow.mjs    # brief → save → render → delete
+node tools/verify-ask.mjs              # target binding, message identity, idempotency
+node tools/verify-dispatch.mjs         # lead fills slots, child spawned with parent + brief
+node tools/verify-template-build.mjs   # gallery dispatch: spawn, image path, 409s
+node tools/verify-target-binding.mjs   # no askAgent('') / sessions[0] regressions
+node tools/verify-locale.mjs           # section headings follow the resume locale (zh/en/de)
+node tools/verify-layout.mjs           # dangling layout refs never reach the sheet or the board
 ```
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) — 0.3.0 fixes a message-identity bug that could corrupt a session log
+(history stopped loading with `session event at seq N lacks an identified message`), binds the panel to
+the conversation it was opened from, and adds `resume_dispatch` plus section add/delete.
 
 ## License
 

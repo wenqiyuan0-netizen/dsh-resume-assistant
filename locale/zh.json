@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "简历助手（Resume Assistant）",
-    "description": "对话内嵌的简历工作台：可自启 PostgreSQL+Reactive Resume 服务、在「简历」标签页里放大编辑、输入框下面一排只显示简历预览，随时把诉求发给 agent；另含 8 个工具与 resume-assistant skill。"
+    "description": "本机简历工作台：左栏入口打开整页编辑器，自启 PostgreSQL+Reactive Resume 服务；对话里的简历编辑派给不带上下文的子 agent；另含 10 个宿主工具、模板画廊（含按参考图生成）与 resume-assistant skill。"
   }
 }

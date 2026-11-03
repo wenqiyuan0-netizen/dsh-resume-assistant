@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Resume Assistant",
-    "description": "An in-chat resume workbench: starts the local PostgreSQL + Reactive Resume stack on demand, embeds the real editor in a Resume view, keeps a compact resume strip under the composer, and hands requests to the agent; plus eight tools and the resume-assistant skill."
+    "description": "A local resume workbench: a left-rail entry opens the full-page editor and boots PostgreSQL + Reactive Resume on demand; resume edits from chat are delegated to a context-free subagent; 10 host tools, a template gallery (including authoring from a screenshot) and the resume-assistant skill."
   }
 }

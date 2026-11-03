@@ -145,7 +145,7 @@ export function apply(ctx, config) {
   const runner = createRunner(ctx, resolved)
   const service = createServiceManager(ctx, resolved)
 
-  const definitions = createToolDefinitions({ config: resolved, runner, service })
+  const definitions = createToolDefinitions({ config: resolved, runner, service, ctx })
   for (const definition of definitions) ctx.tools.register(definition)
 
   // 浏览器端插件的同源入口：简历视图 / 底部一排 通过它读状态、起服务、给 agent 发话。

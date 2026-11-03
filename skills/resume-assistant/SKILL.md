@@ -7,14 +7,34 @@
 
 ## 界面在哪
 
-- **「简历」标签页**（对话视图切换处，和 Chat / Trajectory 并列）：整块 Reactive Resume 编辑器，
-  可缩放（−/100%/+）、可直接手动改；右边有输入框，把诉求发给 agent。
-- **输入框下面那一排**：日常对话视图里只显示简历本身（缩小预览）+ 服务状态 + 开关 + 对 agent 说话。
-  点缩略图会在浏览器新窗口打开该简历的编辑页。
+- **左栏「简历」入口 → 整页编辑器**：左边简历列表、中间表单、右边 A4 预览（可缩放、可拖选引用块）。
+  底部是给 agent 的输入框，**旁边写着这条会发到哪个会话**（面板会绑定"你打开它时所在的对话"）。
+- **「排版与分页」**：两栏（主栏 / 侧栏）里拖动栏目即可换栏换页；栏头的 `＋` 新建一个自定义栏目
+  （`sections[<uuid>]`，标题就是栏目名），栏目块上的 `×` 删除、**删前要确认**（会显示里面有几条内容）。
+  增删都只改草稿，点「保存」才写库，写前自动备份。新栏目是空的——往里填内容用
+  `resume_dispatch`（`paths` 指 `/sections/<uuid>/items/0`）或 `resume_patch`。
+- **模板入口**在预览工具条上：15 个内置模板的小样 + 「用参考图做模板」（上传一张截图，
+  插件直接派一个子 agent 照图做，做完入库并出现在画廊里）。
+- **导出 PDF** 是纯本地按钮（宿主 Electron 打印），**不经过模型、不进对话**。
 - **用户在界面上选中了某一块**再来问你时，消息里会带 `选中块：/sections/experience/items/2` 这样的
-  结构地址 —— 直接用它做 `resume_patch` 的 path，不要另猜坐标。
-- 工具栏的「美化这一块」会把选区 + 排版规则（字号层级 / 行高段距 / 对齐 / 项目符号 / 单主色）发给你：
-  按这些规则改，改完回报改了哪几条 path。
+  结构地址 —— 拿它当 `resume_dispatch` 的 `paths`，不要另猜坐标。
+
+## 分工：你说话，简历助手动手
+
+**简历的编辑/排版/美化默认交给「简历助手」子 agent**（`resume_dispatch`）。它**不继承对话上下文**，
+只拿到你填的四样东西：`intent`（要什么）、`resumeId`、`paths`（目标 JSON Pointer）、
+`excerpt`（要写成的原话）。它自己 `resume_show` 读全文、只改这些 path、改完复核，
+然后用完成通知把"改了哪些 path"回给你，你再汇总给用户。
+
+这样做的理由：简历正文动辄上万字，让主对话读一遍、再复述一遍进子 agent，等于同一个 payload
+付两次钱，而且复述会丢字段、改错事实。你只负责**决策**，事实让子 agent 自己取。
+
+什么时候**不**派：
+
+- 用户只是问问题、看简历、比较模板 —— 直接回答；
+- 用户明确给了"把 `/metadata/design/colors/primary` 设成 `rgba(37,99,235,1)`"这种**单字段确定值** ——
+  直接 `resume_patch` 更快更准；
+- `resume_dispatch` 报"没有 subagents 服务" —— 降级成你自己 `resume_patch`，并告诉用户这次是直改的。
 
 **服务随插件自动启动**：插件激活 1.5s 后自己调 `service.start()`（`config.autoStart: false` 可关）。
 所以正常重启 DSH 之后服务就在跑，不需要你先动手；`resume_service(status)` 只用来确认。
@@ -46,6 +66,7 @@ http://localhost:3000 登录后进 **Account → API Keys** 新建一个，把�
 | `resume_doctor` | 自检：钥匙文件、输出目录、服务、MCP 鉴权 |
 | `resume_list` | 列出所有简历（名字 / id / slug / 更新时间） |
 | `resume_show` | **看简历概要**（默认紧凑；`full: true` 才是完整 JSON） |
+| `resume_dispatch` | **把编辑/排版任务派给「简历助手」子 agent**（不继承上下文，完成通知回你） |
 | `resume_patch` | 套用 RFC 6902 JSON Patch 改模板/配色/字体/布局/内容 |
 | `resume_photo` | 上传本地图片并写进简历头像 |
 | `resume_export` | 导出 PDF 到 `04-输出\<人名>\` 并更新 `_索引.md` |
@@ -66,18 +87,24 @@ http://localhost:3000 登录后进 **Account → API Keys** 新建一个，把�
 ## 省 token
 
 `resume_show` 默认只回紧凑概要（模板、主色、字体、纸张、分页、可见栏目、头像状态）。
-只有确实要改深层结构时才 `full: true` —— 改样式基本只需要 `resume_patch`。
+只有确实要改深层结构时才 `full: true`。**别把整份简历读进主对话**：需要动内容就 `resume_dispatch`，
+让子 agent 自己读、自己改，主对话只留你的意图和它回来的变更清单。
 
 ## 常用套路
 
-- **换模板 + 换主色**：`resume_patch` 一次两条
+- **整段改写 / 调排版 / 美化**（"把第 3 条经历压成两行"、"这一块字号层级乱"、"整体塞进一页"）：
+  `resume_dispatch`，`paths` 给到具体条目，`excerpt` 给用户认的原话。
+- **换模板 + 换主色**（单字段确定值）：直接 `resume_patch` 一次两条
   （`/metadata/template`、`/metadata/design/colors/primary`）。
 - **塞进一页**：缩小 `/metadata/typography/body/fontSize`（8~9）、
   `/metadata/typography/body/lineHeight`（1.2~1.35）、`/metadata/page/marginX|marginY`（10~16），
   再把用不上的栏目 `/sections/<id>/hidden` 设 `true`。
 - **换分页布局**：整对象替换 `/metadata/layout`（`pages` 数组，每页含 `main` / `sidebar` 栏目 id）。
 - **头像**：`resume_photo`，直接给本机图片绝对路径。
-- **用户在面板里手动改完，让你接着做**：他会用面板里的输入框把诉求发过来（或直接在对话里说）。
+- **用户在面板里手动改完，让你接着做**：他会用面板里的输入框把诉求发过来（或直接在对话里说）；
+  面板消息前面自带一段"委派块"，按它的要求走。
+- **做新模板**：面板的「用参考图做模板」会自己派子 agent，**不需要你参与**；用户要是直接在对话里
+  让你做，就走 `resume_template(action=brief)` → 派子 agent → `save` → `preview`。
 
 ## 面板嵌的是真应用
 

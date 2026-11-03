@@ -1,7 +1,7 @@
 {
   "name": "dsh-resume-assistant",
-  "version": "0.2.0",
-  "description": "简历助手插件：把本机 Reactive Resume 简历工具变成 DSH 的一部分：8 个宿主工具（含自启服务）、对话内嵌的简历编辑视图、输入框下一排预览，以及 resume-assistant skill。",
+  "version": "0.3.0",
+  "description": "简历助手插件：把本机 Reactive Resume 简历工具变成 DSH 的一部分：10 个宿主工具（含自启服务与子 agent 派活）、左栏整页编辑器、模板画廊（含按参考图生成），以及 resume-assistant skill。",
   "type": "module",
   "main": "index.js",
   "exports": {

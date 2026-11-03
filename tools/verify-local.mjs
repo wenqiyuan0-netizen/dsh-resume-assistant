@@ -66,7 +66,12 @@ plugin.apply(ctx, {})
 console.log(logs.map((line) => `  ${line}`).join('\n'))
 check('名字是 resume-assistant', plugin.name === 'resume-assistant', plugin.name)
 check('inject 含 tools/skills', JSON.stringify(plugin.inject) === '["tools","skills"]', JSON.stringify(plugin.inject))
-check('注册 9 个工具', registeredTools.length === 9, `实际 ${registeredTools.length}`)
+check('注册 10 个工具', registeredTools.length === 10, `实际 ${registeredTools.length}`)
+check(
+  '含 resume_dispatch',
+  registeredTools.some((tool) => tool.name === 'resume_dispatch'),
+  registeredTools.map((tool) => tool.name).join(','),
+)
 check('注册 1 个 skill', registeredSkills.length === 1, `实际 ${registeredSkills.length}`)
 
 const skill = registeredSkills[0] ?? {}

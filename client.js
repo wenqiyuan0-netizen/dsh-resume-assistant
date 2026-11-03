@@ -2,10 +2,13 @@
  * dsh-resume-assistant —— 浏览器端。
  *
  * 两个座位：
- *   1. `conversation.view`（id: resume）—— 「简历」标签页。里面是真正的
- *      Reactive Resume 编辑器：可缩放、可直接手动改，改完还能把诉求发给 agent。
- *   2. `conversation.composer.dock` —— 对话输入框下面那一排：只显示简历本身
- *      （缩小预览）+ 状态 + 开关服务 + 直接对 agent 说话。
+ *   1. `sidebar.panellist` —— 左栏「简历」图标（常驻）。它同时是"进入面板时是哪个对话"
+ *      的哨兵：面板没开时一直跟着 `uiSession.current` 走。
+ *   2. `main`（key: resume）—— 整页编辑器：简历列表 / 表单 / A4 预览 / 引用提问 /
+ *      模板画廊 / 导出 PDF。
+ *
+ * 面板只跟**进入时那个对话窗口**说话（见 `useSessionTarget`）：宿主不认识"当前会话"，
+ * 以前空目标会回退到 `agents.list()[0]`，多任务时消息会随机掉进别的对话。
  *
  * 数据全部走宿主桥 `resume-bridge/*`（`ctx.connection.fetch` 注册的同源路由），
  * 浏览器里不碰密钥、不直连 3000 端口的 MCP。
@@ -81,6 +84,16 @@ window.__ModuleLoader__.load({
         freeActive: '拖动蓝色块即可摆位置',
         freeRelayout: '重排',
         dropHere: '把栏目拖到这里',
+        addSection: '加栏目',
+        sectionName: '新栏目名（如「演讲」「开源」）',
+        removeSection: '删除栏目',
+        confirmDeleteSection: '确认删除栏目',
+        confirmDeleteHint: '连同它下面的内容一起删掉，并从所有页面移除；保存时会先备份旧文档。',
+        cancel: '取消',
+        deleteSection: '删除',
+        newSectionFallback: '新栏目',
+        sectionAdded: '已加栏目（点保存生效）',
+        sectionRemoved: '已删栏目（点保存生效）',
         uploadPhoto: '选择图片',
         removePhoto: '移除',
         showPhoto: '显示',
@@ -178,6 +191,16 @@ window.__ModuleLoader__.load({
         freeActive: 'Drag the blue blocks',
         freeRelayout: 'Re-layout',
         dropHere: 'Drop a section here',
+        addSection: 'Add section',
+        sectionName: 'New section name (e.g. "Talks")',
+        removeSection: 'Delete section',
+        confirmDeleteSection: 'Delete section',
+        confirmDeleteHint: 'Removes the section, its items and every layout reference; saving backs up the old document first.',
+        cancel: 'Cancel',
+        deleteSection: 'Delete',
+        newSectionFallback: 'New section',
+        sectionAdded: 'Section added (save to apply)',
+        sectionRemoved: 'Section removed (save to apply)',
         uploadPhoto: 'Choose image',
         removePhoto: 'Remove',
         showPhoto: 'Show',
@@ -256,14 +279,31 @@ window.__ModuleLoader__.load({
       return await response.json().catch(() => ({}))
     }
 
-    /** 把一段话投给某个会话的 agent。 */
-    async function askAgent(sessionId, body) {
+    /** 一次请求的幂等键（同一个 id 重试不会写两条消息）。 */
+    function requestId() {
+      try {
+        return crypto.randomUUID()
+      } catch {
+        return `req-${Date.now()}-${Math.random().toString(16).slice(2)}`
+      }
+    }
+
+    /**
+     * 把一段话投给**指定的**会话 agent。
+     *
+     * `sessionId` 必填：宿主端已经不再接受空值（空值以前会回退到
+     * `agents.list()[0]`，所以消息会随机掉进别的对话）。
+     * @param sessionId - 目标会话 id。
+     * @param body - 消息正文。
+     * @param meta - `{ panel }`，只用于在会话日志里标记来源。
+     */
+    async function askAgent(sessionId, body, meta = {}) {
       const response = await fetch(`${BRIDGE}/ask`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ sessionId, text: body }),
+        body: JSON.stringify({ sessionId, text: body, clientRequestId: requestId(), panel: meta.panel ?? 'editor' }),
       })
-      return await response.json().catch(() => ({ ok: false, reason: `HTTP ${response.status}` }))
+      return await response.json().catch(() => ({ ok: false, code: `http-${response.status}`, reason: `HTTP ${response.status}` }))
     }
 
     /**
@@ -361,6 +401,107 @@ window.__ModuleLoader__.load({
       if (selection.text !== '') lines.push(`块内容：${selection.text}`)
       lines.push('', body === '' ? '说说这一块要改成什么样。' : body)
       return lines.join('\n')
+    }
+
+    // ---------------------------------------------------------------- 会话绑定
+    //
+    // 一条铁律：**发到"进入简历面板时"那个对话窗口**，绝不猜。
+    //
+    // `uiSession.current` 是「主视图当前 retain 的会话」（`dsh-client-ui-session`
+    // 的 `publishMain()`：取 `retainedBy.mainView > 0` 的那条）。简历面板一旦占住
+    // `main`，会话视图就卸载、retain 归零 —— `current` 会漂到别的会话或变空。
+    // 所以只能在"进入那一刻"抓快照：左栏图标常驻，它渲染时就盯着 `current`，
+    // 面板没开的时候一直更新 `boundSessionId`；面板一开就停更（`panelOpen`）。
+
+    /** 进入面板时的会话 id（"我从哪个对话来的"）。 */
+    let boundSessionId = ''
+
+    /** 面板是否已经占住主视图（占住之后就不再跟着 `current` 漂）。 */
+    let panelOpen = false
+
+    /** 取 `uiSession.current` 的当前值，拿不到就是 `''`。 */
+    function currentSessionId() {
+      try {
+        const ui = ctxRef?.uiSession ?? ctxRef?.get?.('uiSession')
+        const value = ui?.current?.getSnapshot?.()
+        const id = value?.key ?? value?.props?.sessionId
+        return typeof id === 'string' ? id : ''
+      } catch {
+        return ''
+      }
+    }
+
+    /** 面板没开时，跟着当前对话窗口走。 */
+    function trackEntrySession() {
+      if (panelOpen) return
+      const id = currentSessionId()
+      if (id !== '') boundSessionId = id
+    }
+
+    /**
+     * 面板的绑定目标。
+     *
+     * 优先级：进入时快照 → 上次记忆 → 真实为空（此时不猜，让 UI 显示"选择会话"）。
+     * @returns `[sessionId, setSessionId]`。
+     */
+    function useSessionTarget() {
+      const [sessionId, setSessionId] = useState(() => {
+        trackEntrySession()
+        return boundSessionId
+      })
+
+      useEffect(() => {
+        if (sessionId !== '') {
+          boundSessionId = sessionId
+          return undefined
+        }
+        // 面板被恢复时可能还没有绑定：等对话窗口出现再认领一次。
+        let dispose = () => {}
+        try {
+          const source = (ctxRef?.uiSession ?? ctxRef?.get?.('uiSession'))?.current
+          if (source !== undefined && typeof source.subscribe === 'function') {
+            const adopt = () => {
+              const id = source.getSnapshot?.()?.key ?? source.getSnapshot?.()?.props?.sessionId
+              if (typeof id === 'string' && id !== '') {
+                boundSessionId = id
+                setSessionId(id)
+              }
+            }
+            adopt()
+            dispose = source.subscribe(adopt) ?? (() => {})
+          }
+        } catch {
+          dispose = () => {}
+        }
+        return () => {
+          try {
+            dispose()
+          } catch {
+            /* 已释放 */
+          }
+        }
+      }, [sessionId])
+
+      return [sessionId, setSessionId]
+    }
+
+    /**
+     * 投给 lead 的那段"委派块"。
+     *
+     * 为什么写在这里而不是系统提示词里：这条策略只在**面板发话**时需要，
+     * 而系统提示词是全会话生效的。放在消息里，用户也能在对话里看见"它为什么去派活"。
+     */
+    const DELEGATION_BLOCK = [
+      '[简历面板] 这个会话负责和用户对话。关于简历的**编辑/排版/美化**，遵守：',
+      '1. 不要自己排版、不要为了排版直接 resume_patch；也不要自己拼 subagent 参数。',
+      '2. 先 resume_show 看清楚事实，再调 resume_dispatch 派活：intent（要什么）+ resumeId + paths（目标 JSON Pointer）+ excerpt（要写成的原话）。',
+      '3. 派完就告诉用户「已交给简历助手」，等它的完成通知，再把"改了哪些 path、每处改了什么"汇总回来。',
+      '4. 用户只是问问题、不改东西时，直接回答，不要派活。',
+    ].join('\n')
+
+    /** 给面板消息加上委派块。 */
+    function withDelegationBlock(body) {
+      return `${DELEGATION_BLOCK}\n\n----\n${body}`
     }
 
     // ---------------------------------------------------------------- 样式
@@ -519,6 +660,15 @@ window.__ModuleLoader__.load({
       '  border-radius: 7px; background: var(--dsw-alias-bg-overlay); border: 1px solid var(--dsw-alias-border-l1);',
       '  font-size: 12px; }',
       '.rrv-lay-chip:active { cursor: grabbing; }',
+      '.rrv-lay-col-head { display: flex; align-items: center; gap: 6px; }',
+      '.rrv-lay-add { margin-left: auto; border: 0; background: none; cursor: pointer; font-size: 12px; line-height: 1; padding: 0 2px; color: var(--dsw-alias-label-secondary); }',
+      '.rrv-lay-add:hover { color: var(--dsw-alias-label-primary); }',
+      '.rrv-lay-chip .rrv-lay-name { flex: 1; }',
+      '.rrv-lay-x { border: 0; background: none; cursor: pointer; font-size: 13px; line-height: 1; padding: 0 2px; color: var(--dsw-alias-label-secondary); }',
+      '.rrv-lay-x:hover { color: #ef4444; }',
+      '.rrv-lay-new { display: flex; align-items: center; gap: 6px; margin-top: 6px; }',
+      '.rrv-lay-new input { flex: 1; }',
+      '.rrv-lay-confirm { display: flex; align-items: center; gap: 8px; margin-top: 6px; padding: 6px 8px; border-radius: 6px; background: rgba(239,68,68,.08); font-size: 11px; }',
       '.rrv-lay-grip { color: var(--dsw-alias-label-secondary); font-size: 10px; letter-spacing: -1px; }',
       '.rrv-lay-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
       '.rrv-ed-photo { display: flex; align-items: center; gap: 10px; }',
@@ -639,327 +789,6 @@ window.__ModuleLoader__.load({
       )
     }
 
-    // ---------------------------------------------------------------- 视图
-
-    /** 「简历」标签页：整块编辑器 + 缩放 + 对 agent 说话。 */
-    function ResumeView() {
-      const t = text()
-      const bridge = useBridge(4000)
-      const [selection, setSelection] = useResumeSelection('#rrv-view-frame')
-      const [zoom, setZoom] = useState(1)
-      const [resumeId, setResumeId] = useState('')
-      const [sessionId, setSessionId] = useState('')
-      const [draft, setDraft] = useState('')
-      const [note, setNote] = useState('')
-      const [busy, setBusy] = useState(false)
-
-      const data = bridge.data
-      const status = data?.status
-      const resumes = data?.resumes ?? []
-      const sessions = data?.sessions ?? []
-      const appUrl = data?.config?.appUrl ?? DEFAULT_APP_URL
-      const running = status?.running === true
-
-      useEffect(() => {
-        if (resumeId === '' && resumes.length > 0) setResumeId(resumes[0].id)
-      }, [resumes, resumeId])
-
-      useEffect(() => {
-        if (sessionId === '' && sessions.length > 0) setSessionId(sessions[0].id)
-      }, [sessions, sessionId])
-
-      const start = useCallback(async () => {
-        setBusy(true)
-        setNote(t.starting)
-        try {
-          const result = await callService('start')
-          setNote(result.ok ? '' : `启动失败：${result.state ?? ''} ${result.detail ?? ''}`.trim())
-        } finally {
-          setBusy(false)
-          void bridge.refresh()
-        }
-      }, [bridge, t.starting])
-
-      const send = useCallback(
-        async (ask) => {
-          const body = typeof ask === 'string' ? ask : draft
-          const composed = composeAsk(selection, body)
-          if (composed.trim() === '') return
-          setBusy(true)
-          try {
-            const result = await askAgent(sessionId, composed)
-            if (result.ok) {
-              setDraft('')
-              setNote(`${t.sent}（${result.transport}）`)
-            } else {
-              try {
-                await navigator.clipboard.writeText(composed)
-                setNote(`${t.copied}：${result.reason}`)
-              } catch {
-                setNote(String(result.reason))
-              }
-            }
-          } finally {
-            setBusy(false)
-          }
-        },
-        [draft, selection, sessionId, t.copied, t.sent],
-      )
-
-      /** 一键"美化这一块"：把选区 + 排版诉求交给 agent。 */
-      const beautify = useCallback(() => {
-        void send(
-          [
-            '把这一块的排版美化一下：',
-            '- 统一字号层级（标题/正文/时间各自固定），对齐到同一条基线；',
-            '- 收紧行高与段间距，去掉多余空行，保证不溢出到下一页；',
-            '- 项目符号统一，动词开头、每条不超过一行；',
-            '- 颜色只保留一个主色强调，其余用中性灰。',
-            '改完告诉我改了哪几条 path。',
-          ].join('\n'),
-        )
-      }, [send])
-
-      const src = resumeId === '' ? appUrl : `${appUrl}/builder/${resumeId}`
-
-      const toolbar = h(
-        'div',
-        { className: 'rrv-bar' },
-        h(StatusPill, { status, busy }),
-        h(ResumePicker, { resumes, value: resumeId, onChange: setResumeId }),
-        h(
-          'button',
-          {
-            className: 'rrv-btn',
-            title: t.zoomOut,
-            onClick: () => setZoom((value) => Math.max(0.4, Math.round((value - 0.1) * 10) / 10)),
-          },
-          '−',
-        ),
-        h('button', { className: 'rrv-btn', title: t.resetZoom, onClick: () => setZoom(1) }, `${Math.round(zoom * 100)}%`),
-        h(
-          'button',
-          {
-            className: 'rrv-btn',
-            title: t.zoomIn,
-            onClick: () => setZoom((value) => Math.min(2, Math.round((value + 0.1) * 10) / 10)),
-          },
-          '+',
-        ),
-        h(
-          'a',
-          { className: 'rrv-btn', title: t.openWindow, href: src, target: '_blank', rel: 'noopener' },
-          t.openWindow,
-        ),
-        sessions.length > 1
-          ? h(
-              'select',
-              {
-                className: 'rrv-select',
-                value: sessionId,
-                title: t.session,
-                onChange: (event) => setSessionId(event.target.value),
-              },
-              sessions.map((session) =>
-                h('option', { key: session.id, value: session.id }, session.title || session.id.slice(0, 8)),
-              ),
-            )
-          : null,
-        h(
-          'div',
-          { className: 'rrv-ask' },
-          selection !== null
-            ? h(
-                'span',
-                { className: 'rrv-chip', title: `${selection.path || selection.label}` },
-                `${t.selected} ${selection.path || selection.label}`,
-              )
-            : null,
-          h('input', {
-            className: 'rrv-input',
-            value: draft,
-            placeholder: selection !== null ? t.askSelectedHint : t.askPlaceholder,
-            title: t.askTitle,
-            onChange: (event) => setDraft(event.target.value),
-            onKeyDown: (event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault()
-                void send()
-              }
-            },
-          }),
-          h(
-            'button',
-            { className: 'rrv-btn', onClick: () => beautify(), disabled: busy, title: t.beautifyHint },
-            t.beautify,
-          ),
-          h(
-            'button',
-            { className: 'rrv-btn primary', onClick: () => void send(), disabled: busy || draft.trim() === '' },
-            busy ? t.sending : t.send,
-          ),
-        ),
-      )
-
-      const body = running
-        ? h(
-            'div',
-            { className: 'rrv-stage' },
-            h(
-              'div',
-              {
-                className: 'rrv-frame-wrap',
-                style: { transform: `scale(${zoom})`, width: `${100 / zoom}%`, height: `${100 / zoom}%` },
-              },
-              h('iframe', {
-                id: 'rrv-view-frame',
-                className: 'rrv-frame',
-                src,
-                title: 'Reactive Resume',
-                style: { width: '100%', height: '100%' },
-                allow: 'clipboard-read; clipboard-write; fullscreen',
-              }),
-            ),
-          )
-        : h(
-            'div',
-            { className: 'rrv-empty' },
-            h('span', { className: 'rrv-dot off' }),
-            h('div', null, t.noService),
-            h('button', { className: 'rrv-btn primary', onClick: () => void start(), disabled: busy }, busy ? t.starting : t.start),
-            note === '' ? null : h('div', { className: 'rrv-notice' }, note),
-          )
-
-      return h(
-        'div',
-        { className: 'rrv-root' },
-        h(Styles),
-        toolbar,
-        running && note !== ''
-          ? h('div', { className: 'rrv-notice', style: { padding: '6px 12px' } }, note)
-          : null,
-        body,
-      )
-    }
-
-    /** 输入框下面那一排：正常对话视图里只出现简历本身（缩小预览）+ 状态 + 动作。 */
-    function ResumeDock() {
-      const t = text()
-      const bridge = useBridge(6000)
-      const [resumeId, setResumeId] = useState('')
-      const [busy, setBusy] = useState(false)
-      const [draft, setDraft] = useState('')
-      const [note, setNote] = useState('')
-
-      const data = bridge.data
-      const status = data?.status
-      const resumes = data?.resumes ?? []
-      const sessions = data?.sessions ?? []
-      const appUrl = data?.config?.appUrl ?? DEFAULT_APP_URL
-      const running = status?.running === true
-
-      useEffect(() => {
-        if (resumeId === '' && resumes.length > 0) setResumeId(resumes[0].id)
-      }, [resumes, resumeId])
-
-      const start = useCallback(async () => {
-        setBusy(true)
-        try {
-          const result = await callService('start')
-          setNote(result.ok ? '' : `启动失败：${result.detail ?? result.state ?? '接口无响应（桥没挂上？）'}`)
-        } catch (error) {
-          setNote(`启动失败：${error instanceof Error ? error.message : String(error)}`)
-        } finally {
-          setBusy(false)
-          void bridge.refresh()
-        }
-      }, [bridge])
-
-      const send = useCallback(async () => {
-        const body = draft.trim()
-        if (body === '') return
-        setBusy(true)
-        try {
-          const result = await askAgent(sessions[0]?.id ?? '', body)
-          if (result.ok) {
-            setDraft('')
-            setNote(t.sent)
-          } else {
-            setNote(`发送失败：${result.reason}`)
-          }
-        } finally {
-          setBusy(false)
-        }
-      }, [draft, sessions, t.sent])
-
-      const src = resumeId === '' ? appUrl : `${appUrl}/builder/${resumeId}`
-      const current = resumes.find((resume) => resume.id === resumeId)
-
-      return h(
-        'div',
-        { className: 'rrv-dock', title: t.stripTitle },
-        h(Styles),
-        running && resumeId !== ''
-          ? h(
-              'a',
-              { className: 'rrv-thumb', href: src, target: '_blank', rel: 'noopener', title: t.editor },
-              h('iframe', { className: 'rrv-frame', src, title: 'resume preview', scrolling: 'no' }),
-              h('span', { className: 'rrv-thumb-hint' }, t.editor),
-            )
-          : h('span', { className: 'rrv-dock-glyph' }, h(DocGlyph)),
-        h(
-          'div',
-          { className: 'rrv-dock-text' },
-          h(
-            'div',
-            { className: 'rrv-dock-title' },
-            h('span', { className: `rrv-dot ${busy ? 'busy' : running ? 'on' : 'off'}` }),
-            h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis' } }, current?.name ?? t.stripTitle),
-          ),
-          h(
-            'div',
-            { className: 'rrv-dock-sub' },
-            note !== ''
-              ? note
-              : bridge.error
-                ? `${t.bridgeDown}：${bridge.error}`
-                : running
-                  ? `${t.running}${current?.updatedAt ? ` · ${current.updatedAt.slice(0, 10)}` : ''}`
-                  : t.noService,
-          ),
-        ),
-        h(
-          'div',
-          { className: 'rrv-dock-actions' },
-          running && resumes.length > 1 ? h(ResumePicker, { resumes, value: resumeId, onChange: setResumeId }) : null,
-          running
-            ? h('a', { className: 'rrv-btn', href: src, target: '_blank', rel: 'noopener' }, t.open)
-            : h(
-                'button',
-                { className: 'rrv-btn primary', onClick: () => void start(), disabled: busy, type: 'button' },
-                busy ? t.starting : t.start,
-              ),
-          running
-            ? h('input', {
-                className: 'rrv-input',
-                value: draft,
-                placeholder: t.askPlaceholder,
-                onChange: (event) => setDraft(event.target.value),
-                onKeyDown: (event) => {
-                  if (event.key === 'Enter' && !event.shiftKey) {
-                    event.preventDefault()
-                    void send()
-                  }
-                },
-              })
-            : null,
-          running
-            ? h('button', { className: 'rrv-btn', onClick: () => void send(), disabled: draft.trim() === '', type: 'button' }, t.send)
-            : null,
-        ),
-      )
-    }
-
     // ---------------------------------------------------------------- 本地数据面（直连 Postgres）
     // 面板不依赖应用前端，也不依赖它的 MCP：`resume.data` 就是整份文档。
 
@@ -1028,6 +857,21 @@ window.__ModuleLoader__.load({
       return await response.json()
     }
 
+    /**
+     * POST 一个桥端点，**总是**把 JSON 读回来（4xx 也读）。
+     *
+     * 409 里带着 `code`（`session-not-live` / `image-missing`），那是要显示给用户的原因；
+     * `localPost` 会在非 2xx 时直接抛 `HTTP 409`，把原因吞掉。
+     */
+    async function postBridge(path, body) {
+      const response = await fetch(`${BRIDGE}/${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body ?? {}),
+      })
+      return await response.json().catch(() => ({ ok: false, code: `http-${response.status}`, reason: `HTTP ${response.status}` }))
+    }
+
     /** POST 一个返回 HTML 的端点（渲染）。 */
     async function localHtml(path, body) {
       const response = await fetch(`${BRIDGE}/${path}`, {
@@ -1043,8 +887,31 @@ window.__ModuleLoader__.load({
      *
      * 外壳的 `panelRow` 本身就是按钮（负责 selectPanel + 显示 label），
      * 这里只提供 glyph，不再嵌套一个 button（嵌套 button 是非法 HTML）。
+     *
+     * 它同时是"进入面板时是哪个对话"的哨兵：图标常驻在左栏，面板没开的
+     * 时候一直跟着 `uiSession.current` 走；点开面板的那一刻 `boundSessionId`
+     * 就是当时那个对话窗口。
      */
     function ResumePanelIcon() {
+      useEffect(() => {
+        trackEntrySession()
+        let dispose = () => {}
+        try {
+          const source = (ctxRef?.uiSession ?? ctxRef?.get?.('uiSession'))?.current
+          if (source !== undefined && typeof source.subscribe === 'function') {
+            dispose = source.subscribe(() => trackEntrySession()) ?? (() => {})
+          }
+        } catch {
+          dispose = () => {}
+        }
+        return () => {
+          try {
+            dispose()
+          } catch {
+            /* 已释放 */
+          }
+        }
+      }, [])
       return h('span', { style: { display: 'inline-flex', alignItems: 'center' } }, h(DocGlyph))
     }
 
@@ -1079,6 +946,8 @@ window.__ModuleLoader__.load({
       const [thumbs, setThumbs] = useState({})
       const [customTemplates, setCustomTemplates] = useState([])
       const [building, setBuilding] = useState(null)
+      const [newSection, setNewSection] = useState(null)
+      const [pendingDelete, setPendingDelete] = useState(null)
       const [buildNote, setBuildNote] = useState('')
       const [askH, setAskH] = useState(132)
       const [expanded, setExpanded] = useState(false)
@@ -1086,9 +955,20 @@ window.__ModuleLoader__.load({
       const bigFrameRef = React.useRef(null)
       const sheetBoxRef = React.useRef(null)
       const dragRef = React.useRef(null)
-      // 只读一次会话列表：用来告诉用户"这条请求会投到哪个会话"
+      // 会话列表：只读一次，用来渲染绑定目标的名字 / 兜底选择器
       const bridge = useBridge(0)
-      const targetSession = (bridge.data?.sessions ?? [])[0]?.title ?? ''
+      const [target, setTarget] = useSessionTarget()
+      // 面板占住主视图期间，不让 `uiSession.current` 把绑定带跑
+      useEffect(() => {
+        panelOpen = true
+        return () => {
+          panelOpen = false
+        }
+      }, [])
+      const sessions = bridge.data?.sessions ?? []
+      const roots = sessions.filter((session) => session.root !== false)
+      const targetInfo = sessions.find((session) => session.id === target)
+      const targetLabel = targetInfo?.title || (target === '' ? '' : `${target.slice(0, 12)}…`)
 
       /** 纵向拖拽：调引用输入区的高度。 */
       const startAskDrag = useCallback((event) => {
@@ -1198,7 +1078,7 @@ window.__ModuleLoader__.load({
         try {
           const result = await localPost('local/update', {
             id: selected,
-            partial: { basics: doc.basics, summary: doc.summary, metadata: doc.metadata, picture: doc.picture },
+            partial: { basics: doc.basics, summary: doc.summary, metadata: doc.metadata, picture: doc.picture, sections: doc.sections },
           })
           if (result.error) setNote(`保存失败：${result.error}`)
           else {
@@ -1212,25 +1092,9 @@ window.__ModuleLoader__.load({
         }
       }, [doc, selected, t.saving, t.saved, loadList])
 
-      /** 一键导出到对话：交给 agent 用 resume_export 落地 PDF 并回路径。 */
-      const exportToChat = useCallback(async () => {
-        if (selected === '') return
-        const current = rows.find((row) => row.id === selected)
-        const message = [
-          `把简历「${current?.name ?? selected}」（id: ${selected}）导出成 PDF：`,
-          `- 目标目录 04-输出\\${current?.name ?? '未命名'}\\`,
-          '- 用 resume_export，导出后把绝对路径回给我，并在对话里挂上文件卡片',
-        ].join('\n')
-        setBusy(true)
-        try {
-          const result = await askAgent('', message)
-          setNote(result.ok ? t.sent : `发送失败：${result.reason}`)
-        } catch (error) {
-          setNote(`发送失败：${error instanceof Error ? error.message : String(error)}`)
-        } finally {
-          setBusy(false)
-        }
-      }, [rows, selected, t.sent])
+      // 注意：以前这里有个"导出到对话"（让 agent 调 resume_export）。已删除：
+      // `local/export` 直接打印 PDF，不经过模型，也不往对话里塞一句"导出成 PDF"。
+      // 那条消息正是把会话写坏的那一条（无 id 的 user/message）。
 
       const field = (label, path, value, placeholder) =>
         h(
@@ -1269,12 +1133,105 @@ window.__ModuleLoader__.load({
       // 之前 —— useCallback 的依赖数组是**立即求值**的，写在后面就是 TDZ
       // （ReferenceError: Cannot access 'layoutPages' before initialization）。
 
-      /** 当前排版模型；缺省就用一页、主栏放全部可见栏目。 */
-      const layoutPages =
+      /**
+       * 当前排版模型；缺省就用一页、主栏放**真实存在**的栏目。
+       *
+       * 这里必须按 `doc.sections` 过滤：排版页里可能留着指向"已不存在的栏目"的引用
+       * （比如 RR 里删掉的自定义栏目，或过去某次 patch 留下的残留），
+       * 不过滤就会在面板里显示成一串 UUID「乱码块」，而渲染器那边本来就忽略它们。
+       * 过滤后只要用户点一次保存，脏引用就被写回了。
+       */
+      const sectionKinds = Object.keys(doc?.sections ?? {})
+      const rawPages =
         Array.isArray(doc?.metadata?.layout?.pages) && doc.metadata.layout.pages.length > 0
           ? doc.metadata.layout.pages
-          : [{ main: SECTION_KINDS.slice(), sidebar: [] }]
+          : [{ main: sectionKinds.slice(), sidebar: [] }]
+      const layoutPages = rawPages.map((page) => ({
+        ...page,
+        main: (page.main ?? []).filter((kind) => sectionKinds.includes(kind)),
+        sidebar: (page.sidebar ?? []).filter((kind) => sectionKinds.includes(kind)),
+      }))
+      // 有栏目没被任何一页收留（新增的、或刚从脏引用里恢复的）：补到最后一页主栏，
+      // 与渲染器的 orphan 处理保持一致。
+      {
+        const placed = new Set(layoutPages.flatMap((page) => [...page.main, ...page.sidebar]))
+        const orphans = sectionKinds.filter((kind) => !placed.has(kind))
+        if (orphans.length > 0) layoutPages[layoutPages.length - 1].main.push(...orphans)
+      }
       const activePage = Math.min(pageIndex, layoutPages.length - 1)
+
+      /** 栏目显示名：优先用简历自己的 `section.title`（正文语言），再退回面板词典。 */
+      const sectionLabel = (kind) => doc?.sections?.[kind]?.title || SECTION_LABEL[kind] || kind
+
+      /** 待删除栏目里有多少条内容（确认文案用）。 */
+      const pendingDeleteCount =
+        pendingDelete === null ? 0 : (doc?.sections?.[pendingDelete.kind]?.items ?? []).length
+
+      /**
+       * 新加一个栏目。
+       *
+       * 自定义栏目在 Reactive Resume 里就是 `sections[<uuid>] = { title, items, ... }`，
+       * 这里照同一个形状造一个空栏目，并直接放进当前页的指定栏 —— 不然它会以
+       * "没被排版" 的孤儿身份挂在最后一页。
+       */
+      const addSection = useCallback(
+        (name, column) => {
+          const title = String(name ?? '').trim() || t.newSectionFallback
+          const kind = typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : `sec-${Date.now()}`
+          setDoc((previous) => {
+            if (previous === null) return previous
+            const sections = { ...(previous.sections ?? {}) }
+            sections[kind] = {
+              icon: '',
+              items: [],
+              title,
+              hidden: false,
+              columns: 1,
+              keepTogether: false,
+              startOnNewPage: false,
+            }
+            const metaNext = previous.metadata ?? {}
+            const layoutNext = metaNext.layout ?? {}
+            const pages =
+              Array.isArray(layoutNext.pages) && layoutNext.pages.length > 0
+                ? layoutNext.pages.map((page, index) =>
+                    index === activePage ? { ...page, [column]: [...(page[column] ?? []), kind] } : page,
+                  )
+                : [{ main: column === 'main' ? [kind] : [], sidebar: column === 'sidebar' ? [kind] : [] }]
+            return { ...previous, sections, metadata: { ...metaNext, layout: { ...layoutNext, pages } } }
+          })
+          setNote(t.sectionAdded)
+        },
+        [activePage, t.sectionAdded, t.newSectionFallback],
+      )
+
+      /**
+       * 删栏目：内容一起删，**并把所有排版页里的引用一起清掉**。
+       *
+       * 这一步是必须的：只删 sections 而不清 layout，就会留下上一轮那种
+       * "悬空 UUID 块"（渲染器忽略、面板显示成一串 id）。
+       */
+      const removeSection = useCallback(
+        (kind) => {
+          setDoc((previous) => {
+            if (previous === null) return previous
+            const sections = { ...(previous.sections ?? {}) }
+            delete sections[kind]
+            const metaNext = previous.metadata ?? {}
+            const layoutNext = metaNext.layout ?? {}
+            const pages = Array.isArray(layoutNext.pages)
+              ? layoutNext.pages.map((page) => ({
+                  ...page,
+                  main: (page.main ?? []).filter((item) => item !== kind),
+                  sidebar: (page.sidebar ?? []).filter((item) => item !== kind),
+                }))
+              : layoutNext.pages
+            return { ...previous, sections, metadata: { ...metaNext, layout: { ...layoutNext, pages } } }
+          })
+          setNote(t.sectionRemoved)
+        },
+        [t.sectionRemoved],
+      )
 
       /** 写回排版（数组整体替换）。 */
       const setLayout = useCallback(
@@ -1449,9 +1406,9 @@ window.__ModuleLoader__.load({
                     height: `${Number(box?.h ?? 40) * PX_PER_MM}px`,
                   },
                   onPointerDown: startBlockDrag(kind),
-                  title: `${SECTION_LABEL[kind] ?? kind} — ${Number(box?.x ?? 0)},${Number(box?.y ?? 0)}mm`,
+                  title: `${sectionLabel(kind)} — ${Number(box?.x ?? 0)},${Number(box?.y ?? 0)}mm`,
                 },
-                h('span', { className: 'rrv-free-name' }, SECTION_LABEL[kind] ?? kind),
+                h('span', { className: 'rrv-free-name' }, sectionLabel(kind)),
               )
             }),
           ),
@@ -1463,7 +1420,7 @@ window.__ModuleLoader__.load({
               h(
                 'label',
                 { key: `w-${kind}`, className: 'rrv-free-w' },
-                h('span', null, SECTION_LABEL[kind] ?? kind),
+                h('span', null, sectionLabel(kind)),
                 h('input', {
                   type: 'range',
                   min: '40',
@@ -1488,7 +1445,21 @@ window.__ModuleLoader__.load({
               moveSection(payload, { page: activePage, col: column })
             },
           },
-          h('div', { className: 'rrv-lay-col-head' }, label),
+          h(
+            'div',
+            { className: 'rrv-lay-col-head' },
+            label,
+            h(
+              'button',
+              {
+                className: 'rrv-lay-add',
+                type: 'button',
+                title: `${t.addSection}（${column === 'sidebar' ? t.sideCol : t.mainCol}）`,
+                onClick: () => setNewSection({ column, name: '' }),
+              },
+              '＋',
+            ),
+          ),
           (layoutPages[activePage]?.[column] ?? []).map((kind, index) =>
             h(
               'div',
@@ -1513,7 +1484,22 @@ window.__ModuleLoader__.load({
                 },
               },
               h('span', { className: 'rrv-lay-grip' }, '⋮⋮'),
-              h('span', { className: 'rrv-lay-name' }, SECTION_LABEL[kind] ?? kind),
+              h('span', { className: 'rrv-lay-name' }, sectionLabel(kind)),
+              h(
+                'button',
+                {
+                  className: 'rrv-lay-x',
+                  type: 'button',
+                  title: `${t.removeSection}：${sectionLabel(kind)}`,
+                  draggable: false,
+                  onMouseDown: (event) => event.stopPropagation(),
+                  onClick: (event) => {
+                    event.stopPropagation()
+                    setPendingDelete({ kind })
+                  },
+                },
+                '×',
+              ),
             ),
           ),
           (layoutPages[activePage]?.[column] ?? []).length === 0
@@ -1654,6 +1640,68 @@ window.__ModuleLoader__.load({
                   layoutColumn('main', t.mainCol),
                   layoutColumn('sidebar', t.sideCol),
                 ),
+                newSection === null
+                  ? null
+                  : h(
+                      'div',
+                      { className: 'rrv-lay-new' },
+                      h('input', {
+                        className: 'rrv-field-input',
+                        placeholder: t.sectionName,
+                        value: newSection.name,
+                        autoFocus: true,
+                        onChange: (event) => setNewSection({ ...newSection, name: event.target.value }),
+                        onKeyDown: (event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            addSection(newSection.name, newSection.column)
+                            setNewSection(null)
+                          }
+                          if (event.key === 'Escape') setNewSection(null)
+                        },
+                      }),
+                      h('span', { className: 'rrv-ed-hint' }, newSection.column === 'sidebar' ? t.sideCol : t.mainCol),
+                      h(
+                        'button',
+                        {
+                          className: 'rrv-btn primary',
+                          type: 'button',
+                          onClick: () => {
+                            addSection(newSection.name, newSection.column)
+                            setNewSection(null)
+                          },
+                        },
+                        t.addSection,
+                      ),
+                      h('button', { className: 'rrv-btn', type: 'button', onClick: () => setNewSection(null) }, t.cancel),
+                    ),
+                pendingDelete === null
+                  ? null
+                  : h(
+                      'div',
+                      { className: 'rrv-lay-confirm' },
+                      h(
+                        'span',
+                        null,
+                        `${t.confirmDeleteSection}「${sectionLabel(pendingDelete.kind)}」？${
+                          pendingDeleteCount > 0 ? `含 ${pendingDeleteCount} 条内容，` : ''
+                        }${t.confirmDeleteHint}`,
+                      ),
+                      h('span', { style: { flex: 1 } }),
+                      h('button', { className: 'rrv-btn', type: 'button', onClick: () => setPendingDelete(null) }, t.cancel),
+                      h(
+                        'button',
+                        {
+                          className: 'rrv-btn primary',
+                          type: 'button',
+                          onClick: () => {
+                            removeSection(pendingDelete.kind)
+                            setPendingDelete(null)
+                          },
+                        },
+                        t.deleteSection,
+                      ),
+                    ),
                 h('div', { className: 'rrv-ed-hint' }, t.dragSectionHint),
               ),
               h('div', { className: 'rrv-ed-group' }, h('div', { className: 'rrv-ed-title' }, t.style),
@@ -1776,9 +1824,13 @@ window.__ModuleLoader__.load({
         inner.addEventListener('dblclick', () => setTimeout(readSelection, 0))
       }, [])
 
-      /** 把引用 + 诉求发给 agent，然后切回对话去看结果。 */
+      /** 把引用 + 诉求发给**绑定的那个会话**，然后切回对话去看结果。 */
       const sendQuoted = useCallback(async () => {
         if (quotes.length === 0 && textQuote === null && quoteText.trim() === '') return
+        if (target === '') {
+          setNote('还没绑定会话：先在某个对话里打开这个面板，或用下面的会话选择器指定一个。')
+          return
+        }
         const current = rows.find((row) => row.id === selected)
         const message = [
           `简历：${current?.name ?? selected}（id: ${selected}）`,
@@ -1792,12 +1844,12 @@ window.__ModuleLoader__.load({
         ].join('\n')
         setBusy(true)
         try {
-          const result = await askAgent('', message)
+          const result = await askAgent(target, withDelegationBlock(message), { panel: 'editor' })
           if (result.ok === true) {
             setQuotes([])
             setTextQuote(null)
             setQuoteText('')
-            setNote(t.sent)
+            setNote(result.duplicate === true ? '这条已经发过了' : t.sent)
             try {
               ctxRef?.get?.('layout')?.selectPanel?.('conversation')
             } catch {
@@ -1806,10 +1858,12 @@ window.__ModuleLoader__.load({
           } else {
             setNote(`发送失败：${result.reason}`)
           }
+        } catch (error) {
+          setNote(`发送失败：${error instanceof Error ? error.message : String(error)}`)
         } finally {
           setBusy(false)
         }
-      }, [quotes, textQuote, quoteText, rows, selected, t.sent])
+      }, [quotes, textQuote, quoteText, rows, selected, target, t.sent])
 
       /** 导出 PDF：宿主打印成文件；没有 Electron 时退回浏览器打印（排版一致）。 */
       const exportPdf = useCallback(async () => {
@@ -1910,14 +1964,20 @@ window.__ModuleLoader__.load({
       }, [showTemplates, building, t.templateReady])
 
       /**
-       * 上传参考图 → 让 agent 按图做一个新模板。
+       * 上传参考图 → 派一个**不带对话上下文**的子 agent 照图做模板。
        *
-       * 这条路径刻意只放在「模板」入口里：它表达的是"注册一个新模板"，
-       * 和日常改简历的对话分开，语义更干净。
+       * 走 `/template-build` 直连宿主：不经过 lead、不进对话上下文。
+       * 任务书由插件代码拼（`worker-brief.js`），子 agent 自己 read_image 看图、
+       * 产出 manifest、`resume_template(save)` 入库、preview 自检。
+       * 面板这边只轮询模板库等新 id 出现。
        */
       const createTemplateFromImage = useCallback(
         async (file) => {
           if (!file) return
+          if (target === '') {
+            setBuildNote('还没绑定会话：先在某个对话里打开这个面板，再上传参考图。')
+            return
+          }
           setBuildNote(t.templateUploading)
           const dataUrl = await new Promise((resolve) => {
             const reader = new FileReader()
@@ -1933,33 +1993,40 @@ window.__ModuleLoader__.load({
             const known = (await localGet('local/templates')).templates?.map((row) => row.id) ?? []
             setBuilding({ known, startedAt: Date.now() })
             setBuildNote(`${t.templateBuilding}：${String(uploaded.path).split('\\').pop()}`)
-            await askAgent(
-              '',
-              [
-                '新任务：按参考图做一个新模板（这是"注册模板"，不是改简历）。',
-                `参考图：${uploaded.path}`,
-                '',
-                '步骤：',
-                '1. 用 resume_template(action=brief) 拿到任务书；',
-                '2. 派子 agent（与当前会话隔离）只做一件事：照参考图产出 manifest JSON；',
-                '3. resume_template(action=save) 落盘；',
-                '4. resume_template(action=preview) 出样张，回报 id 与逐项对照结果。',
-                '',
-                `完成后请在画布里能看到新模板（id 会出现在模板入口的列表里）。`,
-              ].join('\n'),
-            )
+            const dispatched = await postBridge('template-build', {
+              sessionId: target,
+              imagePath: uploaded.path,
+              name: file.name.replace(/\.[^.]+$/, ''),
+            })
+            if (dispatched.ok !== true) {
+              setBuilding(null)
+              setBuildNote(`${t.templateUploadFailed}：${dispatched.reason ?? ''}`)
+              return
+            }
+            setBuildNote(`${t.templateBuilding}（子 agent ${String(dispatched.childId).slice(0, 12)}…）`)
           } catch (error) {
+            setBuilding(null)
             setBuildNote(`${t.templateUploadFailed}：${error instanceof Error ? error.message : String(error)}`)
           }
         },
-        [t.templateBuilding, t.templateUploading],
+        [t.templateBuilding, t.templateUploading, target],
       )
 
-      /** 打开模板画廊：给 15 个模板各渲一张小样（用当前文档，未保存改动也算）。 */      useEffect(() => {
+      /**
+       * 模板画廊：内置 15 个 + 自定义模板各渲一张小样（用当前文档，未保存改动也算）。
+       *
+       * 自定义模板也必须在这张表里渲 —— 以前只渲内置那 15 个，所以自定义卡片永远显示
+       * "加载中…"（`thumbs[id]` 根本没被填过）。
+       */
+      useEffect(() => {
         if (!showTemplates || doc === null) return undefined
         let cancelled = false
+        const galleryIds = [
+          ...TEMPLATES,
+          ...customTemplates.map((row) => row.id).filter((id) => !TEMPLATES.includes(id)),
+        ]
         Promise.all(
-          TEMPLATES.map(async (template) => {
+          galleryIds.map(async (template) => {
             try {
               const html = await localHtml('local/render', {
                 doc: { ...doc, metadata: { ...(doc.metadata ?? {}), template } },
@@ -1967,7 +2034,8 @@ window.__ModuleLoader__.load({
               })
               return [template, html]
             } catch {
-              return [template, '']
+              // 记一个"失败"标记而不是空串：空串和"还没渲完"长得一样，卡片会永远转圈。
+              return [template, 'render-failed']
             }
           }),
         ).then((pairs) => {
@@ -1976,7 +2044,7 @@ window.__ModuleLoader__.load({
         return () => {
           cancelled = true
         }
-      }, [showTemplates, doc])
+      }, [showTemplates, doc, customTemplates])
 
       const preview = h(
         'aside',
@@ -2082,14 +2150,32 @@ window.__ModuleLoader__.load({
           h(
             'div',
             { className: 'rrv-ed-ask-row' },
-            h('span', { className: 'rrv-ed-hint' }, targetSession === '' ? t.sameSession : `${t.targetSession}：${targetSession}`),
+            h(
+              'span',
+              { className: 'rrv-ed-hint', title: target },
+              target === '' ? '未绑定会话：先在某个对话里打开这个面板' : `${t.targetSession}：${targetLabel}`,
+            ),
+            roots.length > 1
+              ? h(
+                  'select',
+                  {
+                    className: 'rrv-select',
+                    value: target,
+                    title: t.targetSession,
+                    onChange: (event) => setTarget(event.target.value),
+                  },
+                  roots.map((session) =>
+                    h('option', { key: session.id, value: session.id }, session.title || session.id.slice(0, 8)),
+                  ),
+                )
+              : null,
             h(
               'button',
               {
                 className: 'rrv-btn primary',
                 type: 'button',
                 onClick: () => void sendQuoted(),
-                disabled: busy || (quotes.length === 0 && textQuote === null && quoteText.trim() === ''),
+                disabled: busy || target === '' || (quotes.length === 0 && textQuote === null && quoteText.trim() === ''),
               },
               t.send,
             ),
@@ -2154,11 +2240,18 @@ window.__ModuleLoader__.load({
                   h(
                     'div',
                     { className: 'rrv-gal-thumb' },
-                    thumbs[template]
-                      ? h('iframe', { srcDoc: thumbs[template], title: template, className: 'rrv-gal-frame', scrolling: 'no' })
-                      : h('span', { className: 'rrv-gal-loading' }, t.loading),
+                    thumbs[template] === 'render-failed'
+                      ? h('span', { className: 'rrv-gal-loading' }, t.previewFailed)
+                      : thumbs[template]
+                        ? h('iframe', { srcDoc: thumbs[template], title: template, className: 'rrv-gal-frame', scrolling: 'no' })
+                        : h('span', { className: 'rrv-gal-loading' }, t.loading),
                   ),
-                  h('span', { className: 'rrv-gal-name' }, template),
+                  // 自定义模板显示它自己的名字（manifest.label），不是那串 31 位 id
+                  h(
+                    'span',
+                    { className: 'rrv-gal-name', title: template },
+                    customTemplates.find((row) => row.id === template)?.label || template,
+                  ),
                 )
               }),
             ),
@@ -2290,7 +2383,8 @@ window.__ModuleLoader__.load({
     }
 
     return {
-      inject: ['slots'],
+      // `uiSession` 用来拿"进入面板时所在的那个对话"（见 useSessionTarget）。
+      inject: ['slots', 'uiSession'],
       apply(ctx) {
         ctxRef = ctx
         ACTIVE = TEXT[pickLang(ctx)] ?? TEXT['zh-CN']
