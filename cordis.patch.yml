@@ -1,0 +1,19 @@
+# dsh-resume-assistant —— bundle 补丁（profile 层）
+#
+# 安装后本文件由 Loader 读取，把插件宿主端入口插入 profile 树。
+# 宿主端注册：8 个工具 + 1 个 runtime skill + UI 桥（`resume-bridge/*`）；
+# 浏览器端（client.js）注册：对话「简历」视图 + 输入框下面那一排。
+#
+# config 全部有默认值，删掉整行也能跑：
+#   projectRoot  简历助手 项目根目录
+#   scriptDir    脚本目录（默认 <projectRoot>\03-脚本）
+#   nodePath     跑 rr-cv.mjs / 应用服务用的 node（默认 PATH 里的 node）
+#   timeoutMs    单次脚本命令超时毫秒
+#   appPort      应用端口（默认 3000）
+#   appUrl       应用地址（默认 http://localhost:<appPort>）
+- insert:
+    - id: resume-assistant
+      name: dsh-resume-assistant
+      config:
+        timeoutMs: 180000
+        appPort: 3000

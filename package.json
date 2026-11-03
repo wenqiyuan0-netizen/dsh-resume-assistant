@@ -1,0 +1,58 @@
+{
+  "name": "dsh-resume-assistant",
+  "version": "0.2.0",
+  "description": "简历助手插件：把本机 Reactive Resume 简历工具变成 DSH 的一部分：8 个宿主工具（含自启服务）、对话内嵌的简历编辑视图、输入框下一排预览，以及 resume-assistant skill。",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "lib",
+    "skills",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": false,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    },
+    "compatibility": {
+      "dsh": ">=0.2.0-rc.2 <0.3.0",
+      "node": ">=20.18",
+      "profiles": [
+        "desktop",
+        "web"
+      ]
+    }
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh-plugin",
+    "resume",
+    "cv",
+    "reactive-resume",
+    "skill"
+  ],
+  "dependencies": {},
+  "engines": {
+    "node": ">=20.18"
+  },
+  "license": "MIT"
+}
