@@ -3,6 +3,29 @@
 先跑 `node rr-cv.mjs doctor` —— 它一次报出服务/钥匙/接口状态并给修复动作。
 下面是它没覆盖到的情况。
 
+## 面板里「读列表失败：HTTP 404」（简历列表空、预览一直转）
+
+**这是插件自己的 UI 桥没挂上，不是服务/钥匙/数据库的问题。** 判据：同一时刻
+`resume_doctor` 一切正常、`http://localhost:3000` 能打开，但面板标题栏红字、左栏
+`还没有简历`。
+
+```powershell
+# 一条命令分辨：桥挂了 → 200；桥没挂 → 404
+curl.exe -s -o NUL -w "%{http_code}`n" http://127.0.0.1:2999/resume-diag2
+```
+
+`/resume-diag2` 返回 200 说明这一代插件挂上了、`/api/resume-bridge/*` 也在；返回
+404 说明插件行加载了但路由没注册（旧版 0.3.0 及以前：`apply()` 早于 `connection`
+服务，`ctx.get('connection')` 拿到 undefined 就整块跳过）。修复已随 0.3.1 落地，
+具体见 CHANGELOG。
+
+**让修复生效：** 重启 DSH；或在 设置 → 插件 里把「简历助手」关掉再打开（会重新加载
+插件行）。之后重开面板，列表应立刻出现。注意 `/resume-diag2` 故意不放在 `/api` 下，
+所以它不校验浏览器凭证，可以在命令行直接打。
+
+> 别用 `/api/resume-bridge/state` 判断：`/api/*` 对未认证请求一律 401，看着像"路由在"
+> 其实什么也证明不了。
+
 ## HTTP 401 Unauthorized
 
 `rr-key.txt` 里的钥匙无效，或数据库里根本没有这条 key。

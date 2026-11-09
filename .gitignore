@@ -1,4 +1,4 @@
-﻿node_modules/
+node_modules/
 *.log
 .DS_Store
 Thumbs.db
@@ -7,3 +7,29 @@ Thumbs.db
 *.png
 *.jpg
 _local/
+04-输出/
+exports/
+export/
+output/
+_backup/
+
+# 环境变量与密钥
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+credentials*.json
+secrets.*
+
+# 本地备份与一次性脚本
+*.bak
+*.bak-*
+*.bom-bak
+_*.mjs
+*.orig
+*.rej

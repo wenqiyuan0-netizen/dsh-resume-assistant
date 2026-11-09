@@ -45,6 +45,8 @@
 | 邮箱/电话/地址 | `/basics/email`、`/basics/phone`、`/basics/location` | 字符串 |
 | 头像 URL | `/picture/url` | 上传后的 URL |
 | 头像显隐 | `/picture/hidden` | `false` |
+| 头像取景位置 | `/picture/position` | `{ "x": 50, "y": 0 }`（0–100 的百分比，对应 CSS `object-position`；`50/0` = 水平居中、露出顶部） |
+| 头像尺寸 / 圆角 | `/picture/size`、`/picture/borderRadius` | `84`、`50`（50 = 圆形） |
 | 个人简介 | `/summary/content` | HTML 字符串，如 `"<p>…</p>"` |
 | 某栏目的条目 | `/sections/<栏目>/items` | 数组，整替 |
 | 某栏目显隐 | `/sections/<栏目>/hidden` | `true` / `false` |

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * dsh-resume-assistant —— 浏览器端。
  *
  * 两个座位：
@@ -30,6 +30,47 @@ window.__ModuleLoader__.load({
     const TEXT = {
       'zh-CN': {
         view: '简历',
+        // 「经历库」页签（与简历编辑并列的第二个 tab）
+        expTab: '经历库',
+        expNew: '＋ 新增经历',
+        expCountUnit: '条',
+        expEmpty: '还没有经历。点右上角「＋ 新增经历」，把兼职、爱好、证书、小项目都记进来。',
+        expTitle: '标题',
+        expTitlePh: '一句话写清是什么（必填）',
+        expPeriod: '时间',
+        expCategory: '分类',
+        expTags: '标签',
+        expTagsPh: '逗号分隔，如：收银, 夜班',
+        expDescription: '描述',
+        expDescPh: '多行随便写：做了什么、学到什么、结果如何（换行会保留）',
+        // STAR 小故事（面试前背细节用）
+        expStar: 'STAR',
+        expStarS: 'S – Situation',
+        expStarSPh: '当时的处境 / 项目背景',
+        expStarT: 'T – Task',
+        expStarTPh: '你负责什么',
+        expStarA: 'A – Action',
+        expStarAPh: '你具体做了什么',
+        expStarR: 'R – Result',
+        expStarRPh: '结果，带数字',
+        expStarHint: '面试前背细节用；只有填了的段落才会显示',
+        expStory: '口语稿',
+        expStoryHide: '收起口语稿',
+        expCopy: '复制',
+        expCopied: '已复制',
+        expCopyFailed: '复制失败，请手动选择',
+        expEdit: '编辑',
+        expEditTitle: '编辑这条经历',
+        expDelete: '删除',
+        expConfirmDelete: '确认删除',
+        expLoadFailed: '读经历库失败',
+        expSaveFailed: '保存失败',
+        expDeleteFailed: '删除失败',
+        expCreated: '已新增',
+        expUpdated: '已更新',
+        expDeleted: '已删除',
+        expTitleRequired: '标题不能为空',
+        expDataFile: '数据文件',
         running: '服务运行中',
         stopped: '服务未启动',
         starting: '正在启动…',
@@ -100,6 +141,10 @@ window.__ModuleLoader__.load({
         hidePhoto: '隐藏',
         photoSize: '尺寸',
         photoShape: '形状',
+        photoPosition: '位置',
+        photoDragHint: '在左边的方框里拖动照片，调整头像的取景位置（拖动会立即写进草稿，保存后生效）',
+        photoPositionHint: '拖动照片取景；也可以用九宫格直接跳到常见位置',
+        photoCenter: '居中',
         circle: '圆形',
         square: '方形',
         print: '打印 / 存为 PDF',
@@ -137,6 +182,45 @@ window.__ModuleLoader__.load({
       },
       en: {
         view: 'Resume',
+        expTab: 'Experience library',
+        expNew: '+ New entry',
+        expCountUnit: 'entries',
+        expEmpty: 'Nothing here yet. Use "+ New entry" to record part-time jobs, hobbies, certificates or small projects.',
+        expTitle: 'Title',
+        expTitlePh: 'One line: what is it? (required)',
+        expPeriod: 'Period',
+        expCategory: 'Category',
+        expTags: 'Tags',
+        expTagsPh: 'comma separated, e.g. cashier, night shift',
+        expDescription: 'Description',
+        expDescPh: 'Free text: what you did, what you learned, how it turned out (line breaks are kept)',
+        expStar: 'STAR',
+        expStarS: 'S – Situation',
+        expStarSPh: 'Where you were: project background',
+        expStarT: 'T – Task',
+        expStarTPh: 'What you were responsible for',
+        expStarA: 'A – Action',
+        expStarAPh: 'What you actually did',
+        expStarR: 'R – Result',
+        expStarRPh: 'Result, with numbers',
+        expStarHint: 'For rehearsing details before an interview; only filled lines are shown',
+        expStory: 'Speaking script',
+        expStoryHide: 'Hide script',
+        expCopy: 'Copy',
+        expCopied: 'Copied',
+        expCopyFailed: 'Copy failed — select the text manually',
+        expEdit: 'Edit',
+        expEditTitle: 'Edit this entry',
+        expDelete: 'Delete',
+        expConfirmDelete: 'Confirm delete',
+        expLoadFailed: 'Could not read the experience library',
+        expSaveFailed: 'Save failed',
+        expDeleteFailed: 'Delete failed',
+        expCreated: 'Added',
+        expUpdated: 'Updated',
+        expDeleted: 'Deleted',
+        expTitleRequired: 'Title is required',
+        expDataFile: 'Data file',
         running: 'Service running',
         stopped: 'Service stopped',
         starting: 'Starting…',
@@ -207,6 +291,10 @@ window.__ModuleLoader__.load({
         hidePhoto: 'Hide',
         photoSize: 'Size',
         photoShape: 'Shape',
+        photoPosition: 'Position',
+        photoDragHint: 'Drag the photo inside the frame to reframe the headshot (writes to the draft right away; save to apply)',
+        photoPositionHint: 'Drag to reframe, or jump to a common position with the grid',
+        photoCenter: 'Center',
         circle: 'Circle',
         square: 'Square',
         print: 'Print / Save as PDF',
@@ -672,11 +760,23 @@ window.__ModuleLoader__.load({
       '.rrv-lay-grip { color: var(--dsw-alias-label-secondary); font-size: 10px; letter-spacing: -1px; }',
       '.rrv-lay-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
       '.rrv-ed-photo { display: flex; align-items: center; gap: 10px; }',
+      '.rrv-ed-photo-box { width: 72px; height: 72px; flex: none; border-radius: 10px; overflow: hidden;',
+      '  border: 1px solid var(--dsw-alias-border-l1); background: var(--dsw-alias-bg-layer-2);',
+      '  cursor: grab; touch-action: none; }',
+      '.rrv-ed-photo-box.dragging { cursor: grabbing; box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-brand-primary) 45%, transparent); }',
+      '.rrv-ed-photo-box .rrv-ed-avatar { width: 100%; height: 100%; display: block; border: 0; border-radius: 0; }',
       '.rrv-ed-avatar { width: 56px; height: 56px; border-radius: 10px; object-fit: cover;',
       '  border: 1px solid var(--dsw-alias-border-l1); background: var(--dsw-alias-bg-layer-2); }',
       '.rrv-ed-avatar.empty { display: flex; align-items: center; justify-content: center;',
       '  color: var(--dsw-alias-label-secondary); }',
       '.rrv-ed-photo-ctl { display: flex; gap: 6px; flex-wrap: wrap; }',
+      '.rrv-ed-pos { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }',
+      '.rrv-ed-pos-grid { display: inline-grid; grid-template-columns: repeat(3, 18px); gap: 3px; }',
+      '.rrv-ed-pos-cell { width: 18px; height: 18px; padding: 0; border-radius: 4px; cursor: pointer;',
+      '  border: 1px solid var(--dsw-alias-border-l1); background: var(--dsw-alias-bg-overlay); }',
+      '.rrv-ed-pos-cell:hover { border-color: var(--dsw-alias-label-secondary); }',
+      '.rrv-ed-pos-cell.active { border-color: var(--dsw-alias-brand-primary);',
+      '  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 32%, transparent); }',
       '.rrv-quick { display: flex; flex-wrap: wrap; gap: 4px; }',
       '.rrv-range { display: flex; align-items: center; gap: 8px; }',
       '.rrv-range-input { flex: 1; accent-color: var(--dsw-alias-brand-primary); }',
@@ -693,6 +793,64 @@ window.__ModuleLoader__.load({
       '  display: flex; align-items: center; justify-content: center; text-align: center; padding: 16px;',
       '  font-size: 11px; color: var(--dsw-alias-label-secondary); }',
       '.rrv-ed-empty { padding: 16px; font-size: 12px; color: var(--dsw-alias-label-secondary); }',
+      // 「经历库」页签
+      '.rrv-tabs { display: inline-flex; gap: 2px; padding: 2px; border-radius: 9px;',
+      '  background: var(--dsw-alias-bg-layer-2); }',
+      '.rrv-tab { border: 0; background: transparent; color: var(--dsw-alias-label-secondary); font: inherit;',
+      '  font-size: 12px; padding: 4px 10px; border-radius: 7px; cursor: pointer; }',
+      '.rrv-tab:hover { color: var(--dsw-alias-label-primary); }',
+      '.rrv-tab.active { background: var(--dsw-alias-bg-overlay); color: var(--dsw-alias-label-primary);',
+      '  box-shadow: 0 1px 3px rgba(15,23,42,.12); font-weight: 600; }',
+      '.rrv-exp { flex: 1; min-height: 0; overflow: auto; padding: 16px; display: flex;',
+      '  flex-direction: column; gap: 10px; }',
+      '.rrv-exp-head { display: flex; align-items: center; gap: 10px; }',
+      '.rrv-exp-card { border: 1px solid var(--dsw-alias-border-l1); border-radius: 12px;',
+      '  background: var(--dsw-alias-bg-layer-1); overflow: hidden; }',
+      '.rrv-exp-card.open { border-color: var(--dsw-alias-border-l2); }',
+      '.rrv-exp-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px;',
+      '  color: inherit; font: inherit; text-align: left; cursor: pointer; }',
+      '.rrv-exp-row:hover { background: var(--dsw-alias-bg-layer-2); }',
+      '.rrv-exp-row:focus-visible { outline: 2px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 45%, transparent);',
+      '  outline-offset: -2px; }',
+      '.rrv-exp-caret { width: 10px; flex: none; font-size: 10px; color: var(--dsw-alias-label-secondary); }',
+      '.rrv-exp-title { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis;',
+      '  white-space: nowrap; }',
+      '.rrv-exp-period { flex: none; font-size: 11px; color: var(--dsw-alias-label-secondary);',
+      '  font-variant-numeric: tabular-nums; }',
+      '.rrv-exp-cat { flex: none; font-size: 10px; padding: 1px 7px; border-radius: 999px;',
+      '  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 12%, transparent);',
+      '  border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 30%, transparent); }',
+      '.rrv-exp-body { padding: 0 12px 12px 32px; display: flex; flex-direction: column; gap: 8px; }',
+      '.rrv-exp-desc { font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }',
+      '.rrv-exp-tags { display: flex; flex-wrap: wrap; gap: 4px; }',
+      '.rrv-exp-tag { font-size: 10px; padding: 1px 7px; border-radius: 999px;',
+      '  color: var(--dsw-alias-label-secondary); background: var(--dsw-alias-bg-layer-2);',
+      '  border: 1px solid var(--dsw-alias-border-l1); }',
+      '.rrv-exp-acts { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }',
+      // STAR 块（展开的卡片里，描述下面）
+      '.rrv-exp-star { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px;',
+      '  border-radius: 10px; background: var(--dsw-alias-bg-layer-2);',
+      '  border: 1px solid var(--dsw-alias-border-l1); }',
+      '.rrv-exp-star-item { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px;',
+      '  align-items: start; }',
+      '.rrv-exp-star-k { font-size: 11px; font-weight: 600; color: var(--dsw-alias-label-secondary);',
+      '  font-variant-numeric: tabular-nums; }',
+      '.rrv-exp-star-v { font-size: 12px; line-height: 1.6; white-space: pre-wrap;',
+      '  word-break: break-word; }',
+      // 口语稿
+      '.rrv-exp-story { border-radius: 10px; background: var(--dsw-alias-bg-layer-2);',
+      '  border: 1px solid var(--dsw-alias-border-l2); padding: 8px 10px;',
+      '  display: flex; flex-direction: column; gap: 6px; }',
+      '.rrv-exp-story-head { display: flex; align-items: center; gap: 8px; }',
+      '.rrv-exp-story-body { font-size: 12px; line-height: 1.8; white-space: pre-wrap;',
+      '  word-break: break-word; user-select: text; }',
+      '.rrv-exp-form { border: 1px solid var(--dsw-alias-border-l2); border-radius: 12px; padding: 12px;',
+      '  background: var(--dsw-alias-bg-layer-1); display: flex; flex-direction: column; gap: 8px; }',
+      '.rrv-exp-grid { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 8px 10px;',
+      '  align-items: center; }',
+      '.rrv-exp-empty { padding: 28px 16px; text-align: center; font-size: 12px;',
+      '  color: var(--dsw-alias-label-secondary); border: 1px dashed var(--dsw-alias-border-l2);',
+      '  border-radius: 12px; }',
     ].join('\n')
 
     /** 把包内样式作为 React 元素渲染，卸载即消失。 */
@@ -796,6 +954,31 @@ window.__ModuleLoader__.load({
     const TEMPLATES = [
       'azurill', 'bronzor', 'chikorita', 'ditgar', 'ditto', 'gengar', 'glalie', 'kakuna', 'lapras',
       'leafish', 'meowth', 'onyx', 'pikachu', 'rhyhorn', 'scizor',
+    ]
+
+    // ---------------------------------------------------------------- 照片取景位置
+    //
+    // 头像用 `object-fit: cover` 裁进方框，所以"换一张竖图，脑袋被切掉"是常事。
+    // 位置存在 `picture.position = { x, y }`（0–100 的百分比，就是 CSS `object-position`
+    // 的那两个数）：拖动照片改它、九宫格改它、宿主渲染（compose.js）读它。
+    // 没有这个字段时按 50/50 处理 = 居中裁，与旧版完全一致。
+
+    /** 把 `picture.position` 收成合法的 `{ x, y }`。 */
+    function photoPositionOf(picture) {
+      const clamp = (value) => {
+        if (value === null || value === undefined || value === '') return 50
+        const number = Number(value)
+        if (!Number.isFinite(number)) return 50
+        return Math.max(0, Math.min(100, Math.round(number)))
+      }
+      return { x: clamp(picture?.position?.x), y: clamp(picture?.position?.y) }
+    }
+
+    /** 九宫格的九个常用取景位（左上 → 右下）。 */
+    const PHOTO_PRESETS = [
+      [0, 0], [50, 0], [100, 0],
+      [0, 50], [50, 50], [100, 50],
+      [0, 100], [50, 100], [100, 100],
     ]
 
     /** 简历的 12 个栏目种类（顺序即默认排版顺序）。 */
@@ -918,6 +1101,474 @@ window.__ModuleLoader__.load({
     /** 应用上下文（apply 时记下，供图标点击用）。 */
     let ctxRef = null
 
+    /** 经历库分类建议（自由文本照样能存；这里只喂 `<datalist>`）。 */
+    const EXP_CATEGORIES = ['兼职', '项目', '爱好', '证书', '其他']
+
+    /** STAR 四段的键，顺序 = 口语稿顺序。宿主只认这四个（多传的会被丢掉）。 */
+    const EXP_STAR_KEYS = ['situation', 'task', 'action', 'result']
+
+    /**
+     * 把一条 item 的 `star` 收敛成**恰好四个字符串**。
+     *
+     * 老条目（上一轮存的）根本没有 `star`，宿主读盘时会补，但客户端也兜一层：
+     * 直接读一个 undefined 再 `.trim()` 是这类改造最典型的白屏原因。
+     * @param item - 任意 item。
+     * @returns `{ situation, task, action, result }`。
+     */
+    function starOf(item) {
+      const raw = item?.star
+      const out = {}
+      for (const key of EXP_STAR_KEYS) {
+        const value = raw !== null && typeof raw === 'object' ? raw[key] : ''
+        out[key] = typeof value === 'string' ? value : value === null || value === undefined ? '' : String(value)
+      }
+      return out
+    }
+
+    /** STAR 里是否有任何一段非空（全空就不渲染那一块）。 */
+    function hasStar(star) {
+      return EXP_STAR_KEYS.some((key) => String(star?.[key] ?? '').trim() !== '')
+    }
+
+    /**
+     * 把 STAR 四段拼成可以直接讲出来的一段话。
+     *
+     * - 顺序固定 S → T → A → R；
+     * - 每段先「去多余空行」（逐行 trim、丢空行、再用 `\n` 接回去），空段跳过；
+     * - 段与段之间用「。」断开，但上一段已经以句末标点结尾时不再补第二个「。」；
+     * - 整段结尾没有句末标点就补一个「。」。
+     * @param star - `{ situation, task, action, result }`。
+     * @returns 口语稿字符串（四段全空则是 `''`）。
+     */
+    function composeStory(star) {
+      const parts = []
+      for (const key of EXP_STAR_KEYS) {
+        const text = String(star?.[key] ?? '')
+          .replace(/\r\n?/g, '\n')
+          .split('\n')
+          .map((line) => line.trim())
+          .filter((line) => line !== '')
+          .join('\n')
+          .trim()
+        if (text !== '') parts.push(text)
+      }
+      if (parts.length === 0) return ''
+      let out = ''
+      for (const part of parts) {
+        if (out !== '' && !/[。！？!?…：:；;，,、]$/.test(out)) out += '。'
+        out += part
+      }
+      if (!/[。！？!?…]$/.test(out)) out += '。'
+      return out
+    }
+
+    /**
+     * 「经历库」页签 —— 整页编辑器里的第二个 tab。
+     *
+     * 形态：卡片列表。折叠时只有 **标题 + 时间 + 分类** 三项，点一下展开完整描述
+     * （`white-space: pre-wrap`，换行原样保留）；再点一下收起。
+     *
+     * 数据全走 `resume-bridge/experiences*`（GET 列表 / POST 保存 / POST 删除），
+     * 宿主把它原子写到 `06-经历库\experiences.json`，浏览器里不留状态 ——
+     * 刷新页面、重启 DSH 都还在。
+     *
+     * 为什么不用 `window.confirm`：webview 里 confirm 常常被拦或和宿主的快捷键
+     * 打架，而且它会阻塞渲染。删除改成"点一下变成确认按钮"的两步式。
+     */
+    function ExperienceLibrary() {
+      const t = text()
+      const [items, setItems] = useState([])
+      const [note, setNote] = useState('')
+      const [filePath, setFilePath] = useState('')
+      const [openId, setOpenId] = useState('')
+      /** 正在编辑的草稿；null = 表单没打开。`id === ''` 表示新增。 */
+      const [draft, setDraft] = useState(null)
+      const [busy, setBusy] = useState(false)
+      const [pendingDelete, setPendingDelete] = useState('')
+      /** 哪张卡片的「口语稿」展开着（点第二次收起）。 */
+      const [storyId, setStoryId] = useState('')
+      /** 复制按钮的一次性反馈：'' | 已复制 | 复制失败。 */
+      const [copyNote, setCopyNote] = useState('')
+
+      const load = useCallback(async () => {
+        try {
+          const data = await localGet('experiences')
+          setItems(Array.isArray(data?.items) ? data.items : [])
+          setFilePath(typeof data?.path === 'string' ? data.path : '')
+          if (typeof data?.error === 'string' && data.error !== '') setNote(`${t.expLoadFailed}：${data.error}`)
+        } catch (error) {
+          setNote(`${t.expLoadFailed}：${error instanceof Error ? error.message : String(error)}`)
+        }
+      }, [t.expLoadFailed])
+
+      useEffect(() => {
+        void load()
+      }, [load])
+
+      const startNew = useCallback(() => {
+        setDraft({ id: '', title: '', period: '', category: EXP_CATEGORIES[0], description: '', tags: '', star: { situation: '', task: '', action: '', result: '' } })
+        setOpenId('')
+        setPendingDelete('')
+        setStoryId('')
+        setCopyNote('')
+        setNote('')
+      }, [])
+
+      const startEdit = useCallback((item) => {
+        setDraft({
+          id: item.id,
+          title: item.title ?? '',
+          period: item.period ?? '',
+          category: item.category ?? '',
+          description: item.description ?? '',
+          tags: Array.isArray(item.tags) ? item.tags.join(', ') : String(item.tags ?? ''),
+          // 老条目没有 star → starOf 给四个空串，表单照常可编辑
+          star: starOf(item),
+        })
+        setOpenId(item.id)
+        setPendingDelete('')
+        setStoryId('')
+        setCopyNote('')
+        setNote('')
+      }, [])
+
+      const saveDraft = useCallback(async () => {
+        if (draft === null) return
+        if (String(draft.title ?? '').trim() === '') {
+          setNote(t.expTitleRequired)
+          return
+        }
+        setBusy(true)
+        try {
+          const result = await postBridge('experiences/save', {
+            // 没有 id 就不带这个键：宿主据此判断"新建"，不会把空串当 id 去找
+            ...(draft.id === '' ? {} : { id: draft.id }),
+            title: draft.title,
+            period: draft.period,
+            category: draft.category,
+            description: draft.description,
+            tags: draft.tags,
+            // 四段都空也照发：宿主把它落成四个空串，等价于"没有 STAR"
+            star: starOf(draft),
+          })
+          if (result?.ok !== true) {
+            setNote(`${t.expSaveFailed}：${result?.error ?? `HTTP ${result?.code ?? '?'}`}`)
+          } else {
+            setNote(`${result.action === 'updated' ? t.expUpdated : t.expCreated}：${result.item?.title ?? ''}`)
+            setDraft(null)
+            await load()
+          }
+        } catch (error) {
+          setNote(`${t.expSaveFailed}：${error instanceof Error ? error.message : String(error)}`)
+        } finally {
+          setBusy(false)
+        }
+      }, [draft, load, t])
+
+      const remove = useCallback(
+        async (id) => {
+          setBusy(true)
+          try {
+            const result = await postBridge('experiences/delete', { id })
+            if (result?.ok !== true) setNote(`${t.expDeleteFailed}：${result?.error ?? `HTTP ${result?.code ?? '?'}`}`)
+            else {
+              setNote(t.expDeleted)
+              setPendingDelete('')
+              setOpenId((current) => (current === id ? '' : current))
+              setDraft((current) => (current !== null && current.id === id ? null : current))
+              await load()
+            }
+          } catch (error) {
+            setNote(`${t.expDeleteFailed}：${error instanceof Error ? error.message : String(error)}`)
+          } finally {
+            setBusy(false)
+          }
+        },
+        [load, t],
+      )
+
+      /** 表单里的一个单行输入框。 */
+      const input = (key, placeholder, extra) =>
+        h('input', {
+          className: 'rrv-field-input',
+          value: draft?.[key] ?? '',
+          placeholder,
+          onChange: (event) => {
+            const value = event.target.value
+            setDraft((previous) => ({ ...(previous ?? {}), [key]: value }))
+          },
+          ...(extra ?? {}),
+        })
+
+      /** 表单里 STAR 的一段：小标题 + 灰字提示 + 3 行 textarea。 */
+      const starArea = (key, label, hint) =>
+        h(
+          'div',
+          { className: 'rrv-exp-star-item', style: { gridTemplateColumns: 'minmax(0, 1fr)' } },
+          h(
+            'div',
+            { style: { display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' } },
+            h('span', { className: 'rrv-exp-star-k' }, label),
+            h('span', { className: 'rrv-ed-hint', style: { maxWidth: 'none' } }, hint),
+          ),
+          h('textarea', {
+            className: 'rrv-field-input rrv-field-area',
+            rows: 3,
+            style: { minHeight: 64, resize: 'vertical', fontFamily: 'inherit' },
+            placeholder: hint,
+            value: draft?.star?.[key] ?? '',
+            onChange: (event) => {
+              const value = event.target.value
+              setDraft((previous) => {
+                const base = previous ?? {}
+                const star = { ...starOf(base), [key]: value }
+                return { ...base, star }
+              })
+            },
+          }),
+        )
+
+      const renderForm = () =>
+        draft === null
+          ? null
+          : h(
+              'div',
+              { className: 'rrv-exp-form' },
+              h('div', { className: 'rrv-ed-title' }, draft.id === '' ? t.expNew : t.expEditTitle),
+              h(
+                'div',
+                { className: 'rrv-exp-grid' },
+                h('span', { className: 'rrv-field-label' }, t.expTitle),
+                input('title', t.expTitlePh, { autoFocus: true }),
+                h('span', { className: 'rrv-field-label' }, t.expPeriod),
+                input('period', '2022 – 2023'),
+                h('span', { className: 'rrv-field-label' }, t.expCategory),
+                input('category', EXP_CATEGORIES.join(' / '), { list: 'rrv-exp-cats' }),
+                h('span', { className: 'rrv-field-label' }, t.expTags),
+                input('tags', t.expTagsPh),
+              ),
+              h('textarea', {
+                className: 'rrv-field-input rrv-field-area',
+                rows: 6,
+                style: { minHeight: 120, resize: 'vertical', fontFamily: 'inherit' },
+                placeholder: t.expDescPh,
+                value: draft.description ?? '',
+                onChange: (event) => {
+                  const value = event.target.value
+                  setDraft((previous) => ({ ...(previous ?? {}), description: value }))
+                },
+              }),
+              // STAR 小故事：四段都可留空，填了才会出现在卡片和口语稿里
+              h(
+                'div',
+                { className: 'rrv-exp-star' },
+                h(
+                  'div',
+                  { style: { display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' } },
+                  h('span', { className: 'rrv-exp-star-k', style: { fontWeight: 700 } }, t.expStar),
+                  h('span', { className: 'rrv-ed-hint', style: { maxWidth: 'none' } }, t.expStarHint),
+                ),
+                starArea('situation', t.expStarS, t.expStarSPh),
+                starArea('task', t.expStarT, t.expStarTPh),
+                starArea('action', t.expStarA, t.expStarAPh),
+                starArea('result', t.expStarR, t.expStarRPh),
+              ),
+              h(
+                'div',
+                { className: 'rrv-exp-acts' },
+                h('span', { className: 'rrv-ed-hint', style: { maxWidth: 'none' } }, filePath === '' ? '' : `${t.expDataFile}：${filePath}`),
+                h('span', { style: { flex: 1 } }),
+                h(
+                  'button',
+                  {
+                    className: 'rrv-btn',
+                    type: 'button',
+                    onClick: () => {
+                      setDraft(null)
+                      setNote('')
+                    },
+                  },
+                  t.cancel,
+                ),
+                h('button', { className: 'rrv-btn primary', type: 'button', onClick: () => void saveDraft(), disabled: busy }, busy ? t.saving : t.save),
+              ),
+              // 自由文本 + 建议值：datalist 不限制输入，随便写「志愿活动」也行
+              h('datalist', { id: 'rrv-exp-cats' }, EXP_CATEGORIES.map((name) => h('option', { key: name, value: name }))),
+            )
+
+      /**
+       * 复制口语稿。
+       *
+       * 优先 `navigator.clipboard.writeText`；没有 API 或抛错（非 https / 老 webview
+       * / 权限被拒）就退到 `document.execCommand('copy')`；两条路都不行才显示
+       * 「复制失败，请手动选择」—— 正文本身可选中，用户还能自己 Ctrl+C。
+       */
+      const copyStory = useCallback(
+        async (content) => {
+          try {
+            if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+              await navigator.clipboard.writeText(content)
+              setCopyNote(t.expCopied)
+              return
+            }
+          } catch {
+            /* 落到降级路径 */
+          }
+          try {
+            const area = document.createElement('textarea')
+            area.value = content
+            area.setAttribute('readonly', '')
+            area.style.position = 'fixed'
+            area.style.top = '-1000px'
+            area.style.opacity = '0'
+            document.body.appendChild(area)
+            area.select()
+            const done = typeof document.execCommand === 'function' ? document.execCommand('copy') : false
+            document.body.removeChild(area)
+            setCopyNote(done ? t.expCopied : t.expCopyFailed)
+          } catch {
+            setCopyNote(t.expCopyFailed)
+          }
+        },
+        [t.expCopied, t.expCopyFailed],
+      )
+
+      const renderCard = (item) => {
+        const open = openId === item.id
+        const tags = Array.isArray(item.tags) ? item.tags : []
+        const star = starOf(item)
+        const showStar = hasStar(star)
+        const story = composeStory(star)
+        const storyOpen = open && storyId === item.id && story !== ''
+        return h(
+          'div',
+          { key: item.id, className: `rrv-exp-card${open ? ' open' : ''}` },
+          h(
+            'div',
+            {
+              className: 'rrv-exp-row',
+              role: 'button',
+              tabIndex: 0,
+              onClick: () => {
+                setOpenId(open ? '' : item.id)
+                // 卡片收起时口语稿跟着收起，下次展开是干净状态
+                setStoryId('')
+                setCopyNote('')
+              },
+              onKeyDown: (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return
+                event.preventDefault()
+                setOpenId(open ? '' : item.id)
+                setStoryId('')
+                setCopyNote('')
+              },
+            },
+            h('span', { className: 'rrv-exp-caret' }, open ? '▾' : '▸'),
+            h('span', { className: 'rrv-exp-title' }, item.title ?? ''),
+            h('span', { style: { flex: 1 } }),
+            item.period ? h('span', { className: 'rrv-exp-period' }, item.period) : null,
+            h('span', { className: 'rrv-exp-cat' }, item.category || '其他'),
+          ),
+          // 正在编辑的那张卡片不再重复展开内容（表单在上面）
+          open && !(draft !== null && draft.id === item.id)
+            ? h(
+                'div',
+                { className: 'rrv-exp-body' },
+                h('div', { className: 'rrv-exp-desc' }, (item.description ?? '') === '' ? '（没有描述）' : item.description),
+                // STAR：只显示填了的段落；四段全空整块不出现（老条目就是这样）
+                showStar
+                  ? h(
+                      'div',
+                      { className: 'rrv-exp-star' },
+                      h(
+                        'div',
+                        { style: { display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' } },
+                        h('span', { className: 'rrv-exp-star-k', style: { fontWeight: 700 } }, t.expStar),
+                        h('span', { className: 'rrv-ed-hint', style: { maxWidth: 'none' } }, t.expStarHint),
+                      ),
+                      EXP_STAR_KEYS.map((key) => {
+                        const label = { situation: t.expStarS, task: t.expStarT, action: t.expStarA, result: t.expStarR }[key]
+                        const value = String(star[key] ?? '').trim()
+                        if (value === '') return null
+                        return h(
+                          'div',
+                          { key, className: 'rrv-exp-star-item' },
+                          h('span', { className: 'rrv-exp-star-k' }, label),
+                          h('div', { className: 'rrv-exp-star-v' }, value),
+                        )
+                      }),
+                    )
+                  : null,
+                tags.length === 0 ? null : h('div', { className: 'rrv-exp-tags' }, tags.map((tag) => h('span', { key: tag, className: 'rrv-exp-tag' }, `#${tag}`))),
+                h(
+                  'div',
+                  { className: 'rrv-exp-acts' },
+                  h('button', { className: 'rrv-btn', type: 'button', onClick: () => startEdit(item) }, t.expEdit),
+                  // 口语稿：跟编辑/删除一排；四段全空就没有可讲的话，按钮不出现
+                  story === ''
+                    ? null
+                    : h(
+                        'button',
+                        {
+                          className: 'rrv-btn',
+                          type: 'button',
+                          title: t.expStory,
+                          onClick: () => {
+                            setCopyNote('')
+                            setStoryId(storyOpen ? '' : item.id)
+                          },
+                        },
+                        storyOpen ? t.expStoryHide : t.expStory,
+                      ),
+                  pendingDelete === item.id
+                    ? h('button', { className: 'rrv-btn', type: 'button', disabled: busy, onClick: () => void remove(item.id) }, t.expConfirmDelete)
+                    : h('button', { className: 'rrv-btn', type: 'button', disabled: busy, onClick: () => setPendingDelete(item.id) }, t.expDelete),
+                  pendingDelete === item.id
+                    ? h('button', { className: 'rrv-btn', type: 'button', onClick: () => setPendingDelete('') }, t.cancel)
+                    : null,
+                  h('span', { style: { flex: 1 } }),
+                  h('span', { className: 'rrv-ed-hint', title: item.id }, `${t.expUpdated} ${String(item.updatedAt ?? '').slice(0, 16).replace('T', ' ')}`),
+                ),
+                // 口语稿：浅色区块 + 右上角「复制」；再点一次按钮收起
+                storyOpen
+                  ? h(
+                      'div',
+                      { className: 'rrv-exp-story' },
+                      h(
+                        'div',
+                        { className: 'rrv-exp-story-head' },
+                        h('strong', { style: { fontSize: 12 } }, t.expStory),
+                        h('span', { style: { flex: 1 } }),
+                        copyNote === '' ? null : h('span', { className: 'rrv-ed-hint', style: { maxWidth: 'none' } }, copyNote),
+                        h('button', { className: 'rrv-btn', type: 'button', onClick: () => void copyStory(story) }, t.expCopy),
+                      ),
+                      h('div', { className: 'rrv-exp-story-body' }, story),
+                    )
+                  : null,
+              )
+            : null,
+        )
+      }
+
+      return h(
+        'div',
+        { className: 'rrv-exp' },
+        h(
+          'div',
+          { className: 'rrv-exp-head' },
+          h('strong', null, t.expTab),
+          h('span', { className: 'rrv-ed-note' }, `${items.length} ${t.expCountUnit}`),
+          h('span', { style: { flex: 1 } }),
+          h('button', { className: 'rrv-btn primary', type: 'button', onClick: startNew, disabled: busy }, t.expNew),
+        ),
+        note === '' ? null : h('div', { className: 'rrv-ed-note', style: { maxWidth: 'none', whiteSpace: 'normal' } }, note),
+        renderForm(),
+        items.length === 0 && draft === null ? h('div', { className: 'rrv-exp-empty' }, t.expEmpty) : null,
+        items.map(renderCard),
+        filePath === '' ? null : h('div', { className: 'rrv-ed-hint', style: { marginTop: 'auto', maxWidth: 'none' } }, `${t.expDataFile}：${filePath}`),
+      )
+    }
+
     /**
      * 「简历」整页编辑器（主面板）。
      *
@@ -926,6 +1577,8 @@ window.__ModuleLoader__.load({
      */
     function ResumeEditor() {
       const t = text()
+      /** 页签名：'resume' = 简历编辑（原来的整套），'experiences' = 经历库。 */
+      const [tab, setTab] = useState('resume')
       const [rows, setRows] = useState([])
       const [selected, setSelected] = useState('')
       const [doc, setDoc] = useState(null)
@@ -955,6 +1608,28 @@ window.__ModuleLoader__.load({
       const bigFrameRef = React.useRef(null)
       const sheetBoxRef = React.useRef(null)
       const dragRef = React.useRef(null)
+      // 导出 PDF 弹窗：选目录 / 文件名；导出后拿截图核照片位置与整体排版。
+      const [showExport, setShowExport] = useState(false)
+      const [exportFolder, setExportFolder] = useState('')
+      const [exportFile, setExportFile] = useState('')
+      // 目标路径与覆盖提示一律来自宿主的 `local/plan`（前端不拼路径字符串）
+      const [exportPlan, setExportPlan] = useState(null)
+      const [exportStale, setExportStale] = useState(false)
+      const [exportFolders, setExportFolders] = useState([])
+      // 三个勾选框：窗口开着时记住就行，不值得持久化（每次导出都是当场的意思表示）
+      const [exportOverwrite, setExportOverwrite] = useState(true)
+      const [exportReveal, setExportReveal] = useState(true)
+      const [exportShots, setExportShots] = useState(true)
+      const [exporting, setExporting] = useState(false)
+      const [exportResult, setExportResult] = useState(null)
+      const [exportError, setExportError] = useState('')
+      // 导出前的第一页缩略图（和导出同一份渲染），以及点开的大图：'html' = 渲染预览，其它 = 截图路径
+      const [exportHtml, setExportHtml] = useState('')
+      const [exportZoom, setExportZoom] = useState('')
+      // 结果卡上「打开文件夹 / 打开 PDF / 复制」的即时反馈：宿主成功与失败都是 200，
+      // 不看 `ok` 就永远"点了没反应"—— 那正是这轮报修的原因。
+      const [exportFlash, setExportFlash] = useState(null)
+      const [copiedPath, setCopiedPath] = useState(false)
       // 会话列表：只读一次，用来渲染绑定目标的名字 / 兜底选择器
       const bridge = useBridge(0)
       const [target, setTarget] = useSessionTarget()
@@ -1069,6 +1744,10 @@ window.__ModuleLoader__.load({
       const page = meta.page ?? {}
       const theme = meta.theme ?? {}
       const typography = meta.typography ?? {}
+      /** 当前取景位置（面板里所有展示头像的地方都用它）。 */
+      const photoPosition = photoPositionOf(doc?.picture)
+      /** 有没有照片：没有就没有"位置"可调，整行藏起来。 */
+      const hasPhoto = typeof doc?.picture?.url === 'string' && doc.picture.url !== ''
 
       /** 保存：只发白名单字段（basics / summary / metadata）。 */
       const save = useCallback(async () => {
@@ -1091,6 +1770,60 @@ window.__ModuleLoader__.load({
           setBusy(false)
         }
       }, [doc, selected, t.saving, t.saved, loadList])
+
+      /**
+       * 拖动照片 = 直接把手指的位移换算成取景位置。
+       *
+       * 手感按"拖照片"而不是"拖窗口"：往右拖 → 图往右走 → 看到的是左边 ⇒ x 变小。
+       * 位移用方框宽高的比例算（框多大都灵），并把结果夹在 0–100，拖出框也不会跑飞。
+       * 位置是绝对值（起点快照 + 总位移），所以来回拖不会累积漂移。
+       */
+      const startPhotoDrag = useCallback((event) => {
+        if (typeof event.button === 'number' && event.button !== 0) return
+        const frame = event.currentTarget
+        const box = frame?.getBoundingClientRect?.()
+        if (!box || box.width === 0 || box.height === 0) return
+        event.preventDefault()
+        const origin = photoPositionOf(doc?.picture)
+        const startX = Number(event.clientX) || 0
+        const startY = Number(event.clientY) || 0
+        try {
+          frame.setPointerCapture?.(event.pointerId)
+        } catch {
+          /* 拖拽捕获不可用时窗口监听照样工作 */
+        }
+        const move = (moveEvent) => {
+          const dx = ((Number(moveEvent.clientX) - startX) / box.width) * 100
+          const dy = ((Number(moveEvent.clientY) - startY) / box.height) * 100
+          setField('picture.position.x', Math.round(Math.max(0, Math.min(100, origin.x - dx))))
+          setField('picture.position.y', Math.round(Math.max(0, Math.min(100, origin.y - dy))))
+        }
+        const end = () => {
+          window.removeEventListener('pointermove', move)
+          window.removeEventListener('pointerup', end)
+          window.removeEventListener('pointercancel', end)
+          frame.classList?.remove('dragging')
+        }
+        frame.classList?.add('dragging')
+        window.addEventListener('pointermove', move)
+        window.addEventListener('pointerup', end)
+        window.addEventListener('pointercancel', end)
+      }, [doc, setField])
+
+      /**
+       * 把取景位置补进预览 iframe 里的照片。
+       *
+       * 宿主渲染（compose.js）本来就会写 `object-position`；这一份是兜底：
+       * 插件宿主还没重启、跑着老渲染器时，预览也能立刻跟着拖拽变，不用等到重启。
+       */
+      const applyPhotoPosition = useCallback((frame, current) => {
+        const inner = frame?.contentDocument
+        if (!inner) return
+        const position = photoPositionOf(current?.picture)
+        inner.querySelectorAll('img.ph').forEach((image) => {
+          image.style.objectPosition = `${position.x}% ${position.y}%`
+        })
+      }, [])
 
       // 注意：以前这里有个"导出到对话"（让 agent 调 resume_export）。已删除：
       // `local/export` 直接打印 PDF，不经过模型，也不往对话里塞一句"导出成 PDF"。
@@ -1551,7 +2284,19 @@ window.__ModuleLoader__.load({
                 h('div', { className: 'rrv-ed-title' }, t.photo),
                 h('div', { className: 'rrv-ed-photo' },
                   doc.picture?.url
-                    ? h('img', { className: 'rrv-ed-avatar', src: doc.picture.url, alt: '' })
+                    ? h('div', {
+                        className: 'rrv-ed-photo-box',
+                        title: t.photoDragHint,
+                        onPointerDown: startPhotoDrag,
+                      },
+                        h('img', {
+                          className: 'rrv-ed-avatar',
+                          src: doc.picture.url,
+                          alt: '',
+                          draggable: false,
+                          style: { objectPosition: `${photoPosition.x}% ${photoPosition.y}%` },
+                        }),
+                      )
                     : h('span', { className: 'rrv-ed-avatar empty' }, h(DocGlyph)),
                   h('div', { className: 'rrv-ed-photo-ctl' },
                     h('label', { className: 'rrv-btn' },
@@ -1603,6 +2348,38 @@ window.__ModuleLoader__.load({
                     onClick: () => setField('picture.borderRadius', doc.picture?.borderRadius === 50 ? 0 : 50),
                   }, doc.picture?.borderRadius === 50 ? t.circle : t.square),
                 ),
+                hasPhoto
+                  ? h('label', { className: 'rrv-field' },
+                      h('span', { className: 'rrv-field-label' }, t.photoPosition),
+                      h('span', { className: 'rrv-ed-pos' },
+                        h('span', { className: 'rrv-ed-pos-grid' },
+                          PHOTO_PRESETS.map(([x, y]) =>
+                            h('button', {
+                              key: `pos-${x}-${y}`,
+                              type: 'button',
+                              title: `${x}% / ${y}%`,
+                              'aria-label': `${x}% / ${y}%`,
+                              className: `rrv-ed-pos-cell${photoPosition.x === x && photoPosition.y === y ? ' active' : ''}`,
+                              onClick: () => {
+                                setField('picture.position.x', x)
+                                setField('picture.position.y', y)
+                              },
+                            }),
+                          ),
+                        ),
+                        h('button', {
+                          className: 'rrv-btn',
+                          type: 'button',
+                          onClick: () => {
+                            setField('picture.position.x', 50)
+                            setField('picture.position.y', 50)
+                          },
+                        }, t.photoCenter),
+                        h('span', { className: 'rrv-ed-hint' }, `${photoPosition.x}% · ${photoPosition.y}%`),
+                      ),
+                    )
+                  : null,
+                hasPhoto ? h('div', { className: 'rrv-ed-hint' }, t.photoPositionHint) : null,
               ),
               h('div', { className: 'rrv-ed-group' }, h('div', { className: 'rrv-ed-title' }, t.summary),
                 h('textarea', {
@@ -1865,37 +2642,217 @@ window.__ModuleLoader__.load({
         }
       }, [quotes, textQuote, quoteText, rows, selected, target, t.sent])
 
-      /** 导出 PDF：宿主打印成文件；没有 Electron 时退回浏览器打印（排版一致）。 */
+      /**
+       * 导出 PDF：渲染 → 打印 → 落进 04-输出 + 逐页截图。
+       *
+       * 导出成功**不关窗**：窗口原地换成结果卡，"文件在哪、印得对不对"就在眼前。
+       * `doc` 是面板里的实时草稿 —— 改了没保存的内容也必须印进这张纸里。
+       */
       const exportPdf = useCallback(async () => {
-        if (selected === '') return
-        setBusy(true)
+        if (selected === '' || doc === null) return
+        setExporting(true)
+        setExportError('')
+        setExportResult(null)
         setNote(t.exporting)
         try {
-          const result = await localPost('local/export', { id: selected })
+          // 用 `postBridge` 而不是 `localPost`：失败时宿主是 400 + `reason`，
+          // `localPost` 只会抛 `HTTP 400`，把要显示给用户的原因吞掉。
+          const result = await postBridge('local/export', {
+            id: selected,
+            doc,
+            folder: exportFolder.trim(),
+            filename: exportFile.trim(),
+            overwrite: exportOverwrite ? 'overwrite' : 'version',
+            screenshots: exportShots,
+            reveal: exportReveal,
+          })
           if (result.ok === true) {
+            setExportResult(result)
             setNote(`${t.exportedTo}：${result.path}`)
             try {
               await navigator.clipboard.writeText(result.path)
             } catch {
               /* 复制失败不影响导出 */
             }
-          } else if (result.needsPrint === true && typeof result.html === 'string') {
+            return
+          }
+          // 整台机器既没有 Chromium 也没有 Electron：把 HTML 交给浏览器打印兜底，
+          // 排版是同一份，所以照片和分页仍然对得上。
+          if (result.needsPrint === true && typeof result.html === 'string') {
             const win = window.open('', '_blank', 'noopener')
             if (win !== null) {
               win.document.write(result.html)
               win.document.close()
               win.setTimeout(() => win.print(), 400)
             }
-            setNote(t.printFallback)
-          } else {
-            setNote(`导出失败：${result.error ?? result.reason ?? '未知原因'}`)
+            setExportError(`宿主没有可用的打印器（${result.reason ?? t.printFallback}）`)
+            return
           }
+          setExportError(result.error ?? result.reason ?? '未知原因')
         } catch (error) {
-          setNote(`导出失败：${error instanceof Error ? error.message : String(error)}`)
+          setExportError(error instanceof Error ? error.message : String(error))
         } finally {
-          setBusy(false)
+          setExporting(false)
         }
-      }, [selected, t.exporting, t.exportedTo, t.printFallback])
+      }, [
+        selected,
+        doc,
+        exportFolder,
+        exportFile,
+        exportOverwrite,
+        exportShots,
+        exportReveal,
+        t.exporting,
+        t.exportedTo,
+        t.printFallback,
+      ])
+
+      /**
+       * 复制路径：异步剪贴板 → `execCommand` 兜底 → 按钮上写结果。
+       *
+       * 旧实现把异常吞掉了，且没有反馈：剪贴板被拒时按钮"点了没反应"，
+       * 用户自然判定它坏了。现在三条路走完必须给出一个可见答案。
+       */
+      const copyPath = useCallback(async (value) => {
+        const text = String(value ?? '')
+        let copied = false
+        try {
+          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            await navigator.clipboard.writeText(text)
+            copied = true
+          }
+        } catch {
+          copied = false
+        }
+        if (!copied) {
+          try {
+            const area = document.createElement('textarea')
+            area.value = text
+            area.setAttribute('readonly', '')
+            area.style.position = 'fixed'
+            area.style.top = '-1000px'
+            area.style.opacity = '0'
+            document.body.appendChild(area)
+            area.select()
+            area.setSelectionRange?.(0, text.length)
+            copied = document.execCommand?.('copy') === true
+            area.remove()
+          } catch {
+            copied = false
+          }
+        }
+        setCopiedPath(copied)
+        setExportFlash(
+          copied
+            ? { kind: 'ok', text: '路径已复制到剪贴板' }
+            : { kind: 'error', text: '复制失败：浏览器不允许写剪贴板，请手动选中路径复制' },
+        )
+        setTimeout(() => setCopiedPath(false), 1800)
+        return copied
+      }, [])
+
+      /**
+       * 结果卡上的「打开文件夹 / 打开 PDF」。
+       *
+       * 宿主返回 `{ ok, method, detail }`：成功要说，失败更要说 —— 静默是这轮
+       * 报修的根因（宿主上一版其实什么都没打开，却回了 ok）。
+       */
+      const fileAction = useCallback(async (kind, path) => {
+        const target = String(path ?? '')
+        if (target === '') return false
+        const label = kind === 'reveal' ? '打开文件夹' : '打开 PDF'
+        setExportFlash({ kind: 'busy', text: label + '…' })
+        try {
+          const payload = await postBridge('local/' + kind, { path: target })
+          if (payload && payload.ok === true) {
+            setExportFlash({ kind: 'ok', text: label + ' 完成' + (payload.detail ? '：' + String(payload.detail) : '（宿主未确认；没看到窗口就重启 DSH）') })
+            return true
+          }
+          const reason = String((payload && (payload.detail || payload.reason)) || '宿主没有给出原因')
+          setExportFlash({ kind: 'error', text: label + ' 失败：' + reason })
+          return false
+        } catch (error) {
+          setExportFlash({ kind: 'error', text: label + '失败：' + (error instanceof Error ? error.message : String(error)) })
+          return false
+        }
+      }, [])
+
+      /**
+       * 目标路径 / 覆盖谁的提示，永远问宿主（`local/plan`）。
+       *
+       * 300 ms 防抖：一边打字一边问会把桥打满，而且路径还没定下来时问了也不算数。
+       * `exportResult` 也在依赖里 —— 导完一次后同名文件就有了，状态条必须重新问一遍。
+       */
+      useEffect(() => {
+        if (!showExport || selected === '' || doc === null) return undefined
+        let cancelled = false
+        const timer = setTimeout(() => {
+          postBridge('local/plan', {
+            id: selected,
+            doc,
+            folder: exportFolder.trim(),
+            filename: exportFile.trim(),
+          })
+            .then((plan) => {
+              if (cancelled) return
+              // 旧宿主没有这条路由（404 / 非 JSON）：路径拿不到，但导出本身照旧能点
+              const usable = typeof plan?.path === 'string' && plan.path !== ''
+              setExportPlan(usable ? plan : null)
+              setExportStale(!usable)
+            })
+            .catch(() => {
+              if (cancelled) return
+              setExportPlan(null)
+              setExportStale(true)
+            })
+        }, 300)
+        return () => {
+          cancelled = true
+          clearTimeout(timer)
+        }
+      }, [showExport, exportFolder, exportFile, selected, doc, exportResult])
+
+      /** 已有目录只喂下拉（`state.outputs[].folder`），不参与拼路径。 */
+      useEffect(() => {
+        if (!showExport) return undefined
+        let cancelled = false
+        localGet('state')
+          .then((state) => {
+            if (cancelled) return
+            const names = (Array.isArray(state?.outputs) ? state.outputs : [])
+              .map((row) => String(row?.folder ?? '').trim())
+              .filter((name) => name !== '')
+            setExportFolders([...new Set(names)])
+          })
+          .catch(() => {
+            /* 读不到就不给下拉，输入框照样能用 */
+          })
+        return () => {
+          cancelled = true
+        }
+      }, [showExport])
+
+      /**
+       * 导出前的第一页缩略图：走 `local/render`（和预览、导出同一份排版，照片已内联）。
+       * 这才是"照片印得对吗"能在按下按钮之前就被看到的原因。
+       */
+      useEffect(() => {
+        if (!showExport || doc === null) return undefined
+        let cancelled = false
+        const timer = setTimeout(() => {
+          localHtml('local/render', { doc, locale: doc?.metadata?.page?.locale })
+            .then((html) => {
+              if (!cancelled && typeof html === 'string') setExportHtml(html)
+            })
+            .catch(() => {
+              if (!cancelled) setExportHtml('')
+            })
+        }, 250)
+        return () => {
+          cancelled = true
+          clearTimeout(timer)
+        }
+      }, [showExport, doc])
 
       /**
        * 预览自适应：A4 宽度 794px，按容器宽度等比缩放，永远不裁边。
@@ -2087,7 +3044,10 @@ window.__ModuleLoader__.load({
                 srcDoc: previewHtml,
                 className: 'rrv-ed-frame',
                 style: { transform: `scale(${scale})` },
-                onLoad: () => attachQuoteHandlers(frameRef.current),
+                onLoad: () => {
+                  attachQuoteHandlers(frameRef.current)
+                  applyPhotoPosition(frameRef.current, doc)
+                },
               }),
             ),
         textQuote === null
@@ -2258,6 +3218,417 @@ window.__ModuleLoader__.load({
           ),
         )
 
+      /**
+       * 导出结果卡：导出成功后就地换掉表单，"文件在哪、印得对不对"一眼可见。
+       * 路径原样显示（不改写成相对路径）：人是要拿去粘贴到别处的。
+       */
+      const renderExportResult = () => {
+        const result = exportResult
+        const shots = (Array.isArray(result?.screenshots) ? result.screenshots : []).filter((row) => typeof row === 'string' && row !== '')
+        const previous = result?.previous ?? null
+        return h(
+          'div',
+          { style: { padding: 16, display: 'flex', flexDirection: 'column', gap: 12, overflow: 'auto' } },
+          h(
+            'div',
+            { style: { fontSize: 14, fontWeight: 600, color: 'var(--dsw-alias-state-success-primary)' } },
+            `✓ 已导出 · ${Number(result?.pages ?? 0)} 页 · ${Math.max(0, Math.round(Number(result?.bytes ?? 0) / 1024))} KB · ${(Number(result?.ms ?? 0) / 1000).toFixed(1)} s`,
+          ),
+          // 串页了就别当成功庆祝：这条红字是"缩内容或调小字号"的唯一提示
+          result?.overflow === true
+            ? h(
+                'div',
+                { style: { fontSize: 12, lineHeight: 1.5, color: 'var(--dsw-alias-state-error-primary, #dc2626)' } },
+                `内容溢出到第 ${Number(result?.pages ?? result?.sheets ?? 0)} 页（串页了）：缩内容或调小字号`,
+              )
+            : null,
+          h(
+            'div',
+            { style: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 } },
+            h(
+              'code',
+              {
+                title: String(result?.path ?? ''),
+                style: {
+                  flex: 1,
+                  minWidth: 0,
+                  fontSize: 11,
+                  fontFamily: 'var(--ds-font-family-code)',
+                  wordBreak: 'break-all',
+                  color: 'var(--dsw-alias-label-secondary)',
+                },
+              },
+              String(result?.path ?? ''),
+            ),
+            h('button', {
+              className: 'rrv-btn' + (copiedPath ? ' primary' : ''),
+              type: 'button',
+              title: '复制路径',
+              onClick: () => void copyPath(result?.path),
+            }, copiedPath ? '已复制' : '复制'),
+          ),
+          result?.overwrote === true && previous !== null
+            ? h('div', { className: 'rrv-ed-hint' }, `已覆盖旧文件（${Number(previous.bytes ?? 0)} B · ${shortTime(previous.mtime) || String(previous.mtime ?? '')}）`)
+            : null,
+          shots.length === 0
+            ? null
+            : h(
+                'div',
+                { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } },
+                shots.map((shot, index) =>
+                  h('img', {
+                    key: shot,
+                    src: `${BRIDGE}/local/file?path=${encodeURIComponent(shot)}`,
+                    alt: `第 ${index + 1} 页`,
+                    title: '点开看大图',
+                    onClick: () => setExportZoom(shot),
+                    style: {
+                      width: 150,
+                      borderRadius: 6,
+                      background: '#fff',
+                      border: '1px solid var(--dsw-alias-border-l1)',
+                      cursor: 'zoom-in',
+                    },
+                  }),
+                ),
+              ),
+          exportError === ''
+            ? null
+            : h(
+                'div',
+                { style: { fontSize: 12, lineHeight: 1.5, color: 'var(--dsw-alias-state-error-primary, #dc2626)', whiteSpace: 'normal' } },
+                `导出失败：${exportError}`,
+              ),
+          h(
+            'div',
+            { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } },
+            h(
+              'button',
+              {
+                className: 'rrv-btn',
+                type: 'button',
+                disabled: String(result?.path ?? '') === '',
+                // 文件在哪这一步不该让人自己找：在资源管理器里选中它
+                onClick: () => void fileAction('reveal', result?.path),
+              },
+              '打开文件夹',
+            ),
+            h(
+              'button',
+              {
+                className: 'rrv-btn',
+                type: 'button',
+                disabled: String(result?.path ?? '') === '',
+                onClick: () => void fileAction('open', result?.path),
+              },
+              '打开 PDF',
+            ),
+            h(
+              'button',
+              {
+                className: 'rrv-btn primary',
+                type: 'button',
+                disabled: exporting,
+                // 回到表单态再导一次：参数都还在，人只需要改想改的那一项
+                onClick: () => {
+                  setExportResult(null)
+                  setExportError('')
+                  void exportPdf()
+                },
+              },
+              exporting ? '导出中…' : '再导一次',
+            ),
+            h('span', { style: { flex: 1 } }),
+            h('button', { className: 'rrv-btn', type: 'button', onClick: () => setShowExport(false) }, t.close),
+          ),
+          // 点了之后到底发生了什么：成功是信息，失败更是（宿主回 200 也可能是失败）。
+          exportFlash === null
+            ? null
+            : h(
+                'div',
+                {
+                  style: {
+                    fontSize: 11,
+                    lineHeight: 1.6,
+                    color:
+                      exportFlash.kind === 'error'
+                        ? 'var(--dsw-alias-state-error-primary, #dc2626)'
+                        : 'var(--dsw-alias-label-secondary)',
+                  },
+                },
+                String(exportFlash.text ?? ''),
+              ),
+        )
+      }
+
+      /**
+       * 导出窗口。
+       *
+       * 它是窗口而不是两个输入框：文件落哪、会不会盖掉旧的、照片印得对吗 ——
+       * 这三个问题必须在按下按钮**之前**就有答案，而不是导完再用一句报错回答。
+       */
+      const renderExportWindow = () => {
+        const resumeName = rows.find((row) => row.id === selected)?.name ?? String(doc?.basics?.name ?? '')
+        const template = String(doc?.metadata?.template ?? '')
+        // 照片 `data:` 与 http 都算有；`hidden` 才是"故意不印"（渲染器认这两个位置）
+        const pictureUrl = String(doc?.picture?.url ?? '')
+        const hasPhoto = pictureUrl !== '' && doc?.picture?.hidden !== true && doc?.picture?.effects?.hidden !== true
+        const canExport = doc !== null && selected !== ''
+        const planPath = String(exportPlan?.path ?? '')
+        const exists = exportPlan?.exists === true
+        const row = (label, control) =>
+          h(
+            'div',
+            { style: { display: 'grid', gridTemplateColumns: '52px minmax(0,1fr)', alignItems: 'center', gap: 10 } },
+            h('span', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } }, label),
+            control,
+          )
+        const tick = (label, checked, onChange) =>
+          h(
+            'label',
+            { style: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' } },
+            h('input', { type: 'checkbox', checked, onChange: (event) => onChange(event.target.checked) }),
+            label,
+          )
+        return [
+          h(
+            'div',
+            { key: 'export-window', className: 'rrv-gal-mask', onClick: () => setShowExport(false) },
+            h(
+              'div',
+              { className: 'rrv-gal', style: { width: 520, maxWidth: '94vw', maxHeight: '88vh' }, onClick: (event) => event.stopPropagation() },
+              h(
+                'div',
+                { className: 'rrv-gal-bar' },
+                h('strong', null, `${t.exportPdf} · ${resumeName === '' ? '（未命名）' : resumeName}`),
+                h('span', { style: { flex: 1 } }),
+                h('button', { className: 'rrv-btn', type: 'button', onClick: () => setShowExport(false) }, t.close),
+              ),
+              // 旧宿主没有 local/plan：路径与覆盖提示给不出来，但导出本身照旧能点
+              exportStale ? h('div', { className: 'rrv-gal-note' }, '导出宿主是旧版本，重启 DSH 后生效') : null,
+              exportResult !== null
+                ? renderExportResult()
+                : h(
+                    'div',
+                    { style: { padding: 16, display: 'flex', flexDirection: 'column', gap: 12, overflow: 'auto' } },
+                    row(
+                      '简历',
+                      h(
+                        'div',
+                        { style: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flexWrap: 'wrap' } },
+                        h(
+                          'select',
+                          {
+                            className: 'rrv-select',
+                            value: selected,
+                            onChange: (event) => setSelected(event.target.value),
+                            title: '换一份简历（导出的是这一份的当前草稿）',
+                          },
+                          rows.length === 0
+                            ? h('option', { value: '' }, '（没有简历）')
+                            : rows.map((item) => h('option', { key: item.id, value: item.id }, item.name || item.slug || item.id)),
+                        ),
+                        h('span', { className: 'rrv-sub' }, `模板 ${template === '' ? '—' : template}`),
+                        h(
+                          'span',
+                          {
+                            className: 'rrv-sub',
+                            style: { color: hasPhoto ? 'var(--dsw-alias-state-success-primary)' : 'var(--dsw-alias-state-warn-primary)' },
+                          },
+                          hasPhoto ? '照片 ✓' : '无照片 ⚠',
+                        ),
+                      ),
+                    ),
+                    row(
+                      '目录',
+                      h(
+                        'div',
+                        { style: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 } },
+                        h('input', {
+                          className: 'rrv-input',
+                          style: { flex: 1, minWidth: 0 },
+                          value: exportFolder,
+                          placeholder: '默认用简历名',
+                          onChange: (event) => setExportFolder(event.target.value),
+                        }),
+                        h(
+                          'select',
+                          {
+                            className: 'rrv-select',
+                            value: exportFolders.includes(exportFolder) ? exportFolder : '',
+                            title: '已有目录',
+                            onChange: (event) => {
+                              if (event.target.value !== '') setExportFolder(event.target.value)
+                            },
+                          },
+                          h('option', { value: '' }, '已有…'),
+                          exportFolders.map((name) => h('option', { key: name, value: name }, name)),
+                        ),
+                      ),
+                    ),
+                    row(
+                      '文件名',
+                      h(
+                        'div',
+                        { style: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 } },
+                        h('input', {
+                          className: 'rrv-input',
+                          style: { flex: 1, minWidth: 0 },
+                          value: exportFile,
+                          placeholder: '默认 <目录>-CV',
+                          onChange: (event) => setExportFile(event.target.value),
+                        }),
+                        h('span', { className: 'rrv-sub' }, '.pdf'),
+                      ),
+                    ),
+                    // 目标路径来自宿主：前端拼字符串迟早和宿主的清洗规则对不上
+                    h(
+                      'div',
+                      { style: { display: 'grid', gridTemplateColumns: '52px minmax(0,1fr)', alignItems: 'start', gap: 10 } },
+                      h('span', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } }, '目标'),
+                      h(
+                        'code',
+                        {
+                          title: planPath,
+                          style: {
+                            fontSize: 11,
+                            lineHeight: 1.5,
+                            fontFamily: 'var(--ds-font-family-code)',
+                            wordBreak: 'break-all',
+                            color: 'var(--dsw-alias-label-secondary)',
+                          },
+                        },
+                        planPath === '' ? (exportStale ? '（宿主旧版本，无法预演路径）' : '算路中…') : planPath,
+                      ),
+                    ),
+                    h(
+                      'div',
+                      {
+                        style: {
+                          fontSize: 12,
+                          color: exists ? 'var(--dsw-alias-state-error-primary, #dc2626)' : 'var(--dsw-alias-state-success-primary)',
+                        },
+                      },
+                      exists
+                        ? `● 将覆盖已有文件（${(Number(exportPlan?.bytes ?? 0) / 1024).toFixed(1)} KB · ${shortTime(exportPlan?.mtime) || '时间未知'}）`
+                        : '● 新文件',
+                    ),
+                    h(
+                      'div',
+                      { style: { display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' } },
+                      tick('覆盖同名文件', exportOverwrite, setExportOverwrite),
+                      tick('导出后打开文件夹', exportReveal, setExportReveal),
+                      tick('逐页截图核排版', exportShots, setExportShots),
+                    ),
+                    // 导出前的第一页：和预览、导出是同一份渲染（照片已内联），
+                    // 所以它上面照片的样子就是纸面上的样子。
+                    h(
+                      'div',
+                      { style: { display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' } },
+                      h('span', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } }, '预览（第一页）'),
+                      h(
+                        'div',
+                        {
+                          title: '点开看大图',
+                          onClick: () => {
+                            if (exportHtml !== '') setExportZoom('html')
+                          },
+                          style: {
+                            width: 334,
+                            height: 472,
+                            overflow: 'hidden',
+                            borderRadius: 8,
+                            border: '1px solid var(--dsw-alias-border-l1)',
+                            background: '#fff',
+                            cursor: exportHtml === '' ? 'default' : 'zoom-in',
+                          },
+                        },
+                        exportHtml === ''
+                          ? h(
+                              'div',
+                              {
+                                style: {
+                                  width: '100%',
+                                  height: '100%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: 11,
+                                  color: 'var(--dsw-alias-label-secondary)',
+                                },
+                              },
+                              previewError !== '' ? t.previewFailed : t.loading,
+                            )
+                          : h('iframe', {
+                              title: 'export-preview',
+                              srcDoc: exportHtml,
+                              sandbox: '',
+                              scrolling: 'no',
+                              style: { width: 794, height: 1123, border: 0, transform: 'scale(.42)', transformOrigin: 'top left' },
+                            }),
+                      ),
+                    ),
+                    exportError === ''
+                      ? null
+                      : h(
+                          'div',
+                          { style: { fontSize: 12, lineHeight: 1.5, color: 'var(--dsw-alias-state-error-primary, #dc2626)', whiteSpace: 'normal' } },
+                          `导出失败：${exportError}`,
+                        ),
+                  ),
+              exportResult !== null
+                ? null
+                : h(
+                    'div',
+                    {
+                      style: {
+                        display: 'flex',
+                        gap: 8,
+                        justifyContent: 'flex-end',
+                        padding: '12px 16px',
+                        borderTop: '1px solid var(--dsw-alias-border-l1)',
+                      },
+                    },
+                    h('button', { className: 'rrv-btn', type: 'button', onClick: () => setShowExport(false) }, '取消'),
+                    h(
+                      'button',
+                      { className: 'rrv-btn primary', type: 'button', disabled: exporting || !canExport, onClick: () => void exportPdf() },
+                      exporting ? '导出中…' : t.exportPdf,
+                    ),
+                  ),
+            ),
+          ),
+          exportZoom === ''
+            ? null
+            : h(
+                'div',
+                { key: 'export-zoom', className: 'rrv-gal-mask', onClick: () => setExportZoom('') },
+                h(
+                  'div',
+                  { className: 'rrv-zoom', onClick: (event) => event.stopPropagation() },
+                  h(
+                    'div',
+                    { className: 'rrv-gal-bar' },
+                    h('strong', null, exportZoom === 'html' ? '预览（第一页）' : '导出截图'),
+                    h('span', { style: { flex: 1 } }),
+                    h('button', { className: 'rrv-btn', type: 'button', onClick: () => setExportZoom('') }, t.close),
+                  ),
+                  h(
+                    'div',
+                    { className: 'rrv-zoom-body' },
+                    exportZoom === 'html'
+                      ? h('iframe', { title: 'export-preview-large', srcDoc: exportHtml, sandbox: '', className: 'rrv-zoom-frame' })
+                      : h('img', {
+                          src: `${BRIDGE}/local/file?path=${encodeURIComponent(exportZoom)}`,
+                          alt: '导出截图',
+                          style: { display: 'block', maxWidth: '100%', margin: '0 auto', background: '#fff' },
+                        }),
+                  ),
+                ),
+              ),
+        ]
+      }
+
       /** 打印放大视图里的那份 A4（同源 srcDoc，可以直接调它的 print）。 */
       const printPreview = useCallback(() => {
         const frame = bigFrameRef.current
@@ -2288,6 +3659,38 @@ window.__ModuleLoader__.load({
           'header',
           { className: 'rrv-ed-bar' },
           h('strong', { className: 'rrv-ed-brand' }, t.view),
+          // 页签：简历编辑 / 经历库。只在头部加一个分支，两边的状态彼此独立。
+          h(
+            'div',
+            { className: 'rrv-tabs', role: 'tablist' },
+            h(
+              'button',
+              {
+                className: `rrv-tab${tab === 'resume' ? ' active' : ''}`,
+                type: 'button',
+                role: 'tab',
+                'aria-selected': tab === 'resume',
+                onClick: () => setTab('resume'),
+              },
+              t.view,
+            ),
+            h(
+              'button',
+              {
+                className: `rrv-tab${tab === 'experiences' ? ' active' : ''}`,
+                type: 'button',
+                role: 'tab',
+                'aria-selected': tab === 'experiences',
+                onClick: () => {
+                  setTab('experiences')
+                  // 切走时把简历那边的浮层收掉，免得压在新的页签上
+                  setShowTemplates(false)
+                  setExpanded(false)
+                },
+              },
+              t.expTab,
+            ),
+          ),
           h(
             'button',
             {
@@ -2304,26 +3707,50 @@ window.__ModuleLoader__.load({
             },
             t.backToChat,
           ),
-          h('button', { className: 'rrv-btn', type: 'button', onClick: () => setShowTemplates(true), disabled: doc === null }, t.templateGallery),
-          note === '' ? null : h('span', { className: 'rrv-ed-note' }, note),
+          // 以下都是简历页签专属的动作；在「经历库」页签上收起来（省得点了没反应）
+          tab !== 'resume' ? null : h('button', { className: 'rrv-btn', type: 'button', onClick: () => setShowTemplates(true), disabled: doc === null }, t.templateGallery),
+          tab !== 'resume' || note === '' ? null : h('span', { className: 'rrv-ed-note' }, note),
           h('span', { style: { flex: 1 } }),
-          h('button', { className: 'rrv-btn', type: 'button', onClick: () => void exportPdf(), disabled: busy || doc === null }, t.exportPdf),
-          h('button', { className: 'rrv-btn primary', type: 'button', onClick: () => void save(), disabled: busy || doc === null }, busy ? t.saving : t.save),
+          tab !== 'resume' ? null : h('button', {
+            className: 'rrv-btn primary',
+            type: 'button',
+            title: '导出成 PDF，落进 04-输出，并逐页截图核排版',
+            onClick: () => {
+              const name = rows.find((row) => row.id === selected)?.name ?? ''
+              setExportFolder(name)
+              setExportFile(name ? `${name}-CV.pdf` : '')
+              // 每次打开都是一次新导出：上一次的结果卡与路径提示不该冒充这一次
+              setExportResult(null)
+              setExportError('')
+              setExportPlan(null)
+              setExportStale(false)
+              setExportHtml('')
+              setExportZoom('')
+              setShowExport(true)
+            },
+            disabled: busy || doc === null,
+          }, t.exportPdf),
+          tab !== 'resume' ? null : h('button', { className: 'rrv-btn primary', type: 'button', onClick: () => void save(), disabled: busy || doc === null }, busy ? t.saving : t.save),
         ),
-        h(
-          'div',
-          {
-            className: 'rrv-ed-body',
-            style: { gridTemplateColumns: `${listW}px 6px minmax(320px, 1fr) 6px ${formW}px` },
-          },
-          list,
-          divider('list'),
-          preview,
-          divider('form'),
-          form,
-        ),
-        showTemplates ? renderGallery() : null,
-        expanded
+        // 唯一的切换点：简历页签渲染原来的三栏；经历库渲染卡片列表。
+        tab === 'experiences'
+          ? h(ExperienceLibrary)
+          : h(
+              'div',
+              {
+                className: 'rrv-ed-body',
+                style: { gridTemplateColumns: `${listW}px 6px minmax(320px, 1fr) 6px ${formW}px` },
+              },
+              list,
+              divider('list'),
+              preview,
+              divider('form'),
+              form,
+            ),
+        tab === 'resume' && showTemplates ? renderGallery() : null,
+        // 导出窗口：算路 → 确认 → 结果卡，全在窗口里完成（原来那两个裸输入框已经不够用了）
+        tab === 'resume' && showExport ? renderExportWindow() : null,
+        tab === 'resume' && expanded
           ? h(
               'div',
               { className: 'rrv-gal-mask', onClick: () => setExpanded(false) },
@@ -2342,12 +3769,32 @@ window.__ModuleLoader__.load({
                 h(
                   'div',
                   { className: 'rrv-zoom-body' },
-                  h('iframe', { ref: bigFrameRef, title: 'preview-large', srcDoc: previewHtml, className: 'rrv-zoom-frame' }),
+                  h('iframe', {
+                    ref: bigFrameRef,
+                    title: 'preview-large',
+                    srcDoc: previewHtml,
+                    className: 'rrv-zoom-frame',
+                    onLoad: () => applyPhotoPosition(bigFrameRef.current, doc),
+                  }),
                 ),
               ),
             )
           : null,
       )
+    }
+
+    /**
+     * `2026-11-09T19:13:35.000Z` → `11-09 20:13`（本地时间）。
+     *
+     * 覆盖提示里只关心"这是不是我刚覆盖的那一份"，日期年份和秒都是噪音；
+     * 解析不了就返回空串，让调用方退回原样显示，别印一个 Invalid Date。
+     */
+    function shortTime(value) {
+      if (value === null || value === undefined || value === '') return ''
+      const date = new Date(value)
+      if (Number.isNaN(date.getTime())) return ''
+      const pad = (number) => String(number).padStart(2, '0')
+      return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
     }
 
     /** `rgba(37,99,235,1)` → `#2563eb`（给 input[type=color] 用）。 */

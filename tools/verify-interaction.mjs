@@ -70,6 +70,7 @@ const responses = {
     data: {
       basics: { name: '测试', headline: '工程师' },
       summary: { content: '摘要' },
+      picture: { url: 'data:image/png;base64,AAAA', size: 80, aspectRatio: 1, borderRadius: 0, effects: { hidden: false } },
       sections: { experience: { items: [{ position: '前端', company: 'ACME' }] }, skills: { items: [{ name: 'TS' }] } },
       metadata: { template: 'onyx', layout: { pages: [{ main: ['experience'], sidebar: ['skills'] }] }, page: {}, theme: {}, typography: {} },
     },
@@ -94,9 +95,15 @@ globalThis.fetch = async (url, init) => {
   const body = key ? responses[key] : {}
   return { ok: true, json: async () => body, text: async () => JSON.stringify(body) }
 }
+/** 窗口级监听（照片拖拽用的是 pointermove/pointerup 挂在 window 上）。 */
+const windowListeners = new Map()
 globalThis.window = {
-  addEventListener() {},
-  removeEventListener() {},
+  addEventListener(name, handler) {
+    windowListeners.set(name, handler)
+  },
+  removeEventListener(name, handler) {
+    if (windowListeners.get(name) === handler) windowListeners.delete(name)
+  },
   setTimeout: (fn) => setTimeout(fn, 0),
   open: () => null,
 }
@@ -232,6 +239,76 @@ console.log('\n== 模板入口 ==')
 const fileInputs = flatten(tree).filter((node) => node.type === 'input' && node.props?.type === 'file')
 check('存在参考图上传入口（file input）', fileInputs.length >= 1, String(fileInputs.length))
 
+// ---------------------------------------------------------------- 照片取景位置
+console.log('\n== 照片取景位置 ==')
+
+/** 头像 img 的 object-position（面板里所见即所得）。 */
+const avatarStyle = (currentTree) => {
+  const avatar = flatten(currentTree).find((node) => node.type === 'img' && node.props?.className === 'rrv-ed-avatar')
+  return String(avatar?.props?.style?.objectPosition ?? '')
+}
+
+check('头像默认居中 50% 50%', avatarStyle(tree) === '50% 50%', avatarStyle(tree))
+
+const posCells = flatten(tree).filter(
+  (node) => node.type === 'button' && String(node.props?.className ?? '').includes('rrv-ed-pos-cell'),
+)
+check('九宫格有 9 个取景位', posCells.length === 9, String(posCells.length))
+
+const topRight = posCells.find((node) => node.props?.title === '100% / 0%')
+check('找到「右上」取景位', topRight !== undefined)
+if (topRight !== undefined) {
+  topRight.props.onClick()
+  tree = await mount()
+  check('点右上 → object-position 100% 0%', avatarStyle(tree) === '100% 0%', avatarStyle(tree))
+}
+
+const centerButton = flatten(tree).find(
+  (node) => node.type === 'button' && textOf(node.props?.children).trim() === '居中',
+)
+check('有「居中」按钮', centerButton !== undefined)
+if (centerButton !== undefined) {
+  centerButton.props.onClick()
+  tree = await mount()
+  check('点居中 → 回到 50% 50%', avatarStyle(tree) === '50% 50%', avatarStyle(tree))
+}
+
+// 拖拽：手指往上拖 20px（方框 100px）→ 取景位置上移到 y=70
+const photoBox = flatten(tree).find((node) => node.props?.className === 'rrv-ed-photo-box')
+check('照片框可拖拽（有 onPointerDown）', typeof photoBox?.props?.onPointerDown === 'function')
+if (typeof photoBox?.props?.onPointerDown === 'function') {
+  const moved = []
+  photoBox.props.onPointerDown({
+    button: 0,
+    pointerId: 1,
+    clientX: 0,
+    clientY: 0,
+    preventDefault() {},
+    currentTarget: {
+      getBoundingClientRect: () => ({ width: 100, height: 100, top: 0, left: 0 }),
+      setPointerCapture() {},
+      classList: { add: (name) => moved.push(`add:${name}`), remove: (name) => moved.push(`remove:${name}`) },
+    },
+  })
+  const move = windowListeners.get('pointermove')
+  check('按下时进了拖拽态（dragging）', moved.includes('add:dragging'), moved.join(','))
+  check('拖拽时挂上了 pointermove', typeof move === 'function')
+  if (typeof move === 'function') {
+    move({ clientX: 0, clientY: -20 })
+    tree = await mount()
+    check('往上拖 20% → 50% 70%', avatarStyle(tree) === '50% 70%', avatarStyle(tree))
+    const clampMove = typeof move === 'function'
+    check('拖拽钳制在 0–100', clampMove && (() => {
+      move({ clientX: 0, clientY: -400 })
+      return true
+    })())
+    tree = await mount()
+    check('拖出边界 → 100%（不越界）', avatarStyle(tree) === '50% 100%', avatarStyle(tree))
+    windowListeners.get('pointerup')?.({})
+    check('松手后摘掉 pointermove', windowListeners.get('pointermove') === undefined)
+  }
+}
+
 // ---------------------------------------------------------------- 栏目增删
 console.log('\n== 栏目增删 ==')
 
@@ -300,6 +377,12 @@ if (saveButton !== undefined) {
   const dangling = layoutRefs.filter((kind) => !(kind in sections))
   check('保存携带 sections', Object.keys(sections).length > 0, JSON.stringify(Object.keys(sections)))
   check('保存的排版里没有悬空引用', dangling.length === 0, dangling.join(','))
+  const picturePosition = partial.picture?.position ?? {}
+  check(
+    '保存携带照片取景位置',
+    Number(picturePosition.x) === 50 && Number(picturePosition.y) === 100,
+    JSON.stringify(picturePosition),
+  )
 }
 
 console.log(`\n${failures === 0 ? '交互自检通过 ✓' : `${failures} 项失败 ✗`}`)
